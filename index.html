@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Конструктор окрасов — прототип coop-field (референс CatWar)</title>
+<script src="catwar-manifest.js"></script>
+<style>
+  /* ретро-стиль в духе оригинального CatWar kns.php */
+  * { box-sizing: border-box; }
+  body { background: #efefef; font: 13px/1.35 Tahoma, Verdana, sans-serif; color: #222; margin: 0; padding: 8px; }
+  a { color: #1d4e89; }
+  .wrap { display: flex; gap: 10px; align-items: flex-start; }
+  .panel { background: #f7f7f7; border: 1px solid #aaa; padding: 8px; }
+  h1 { font-size: 18px; margin: 0 0 2px; color: #7a4a12; }
+  .note { color: #666; font-size: 11px; margin: 0 0 8px; }
+  .catname { font-weight: bold; color: #333; }
+  .cat-group { margin-bottom: 8px; }
+  .cat-title { background: #5d7a61; color: #fff; font-weight: bold; padding: 2px 6px; border: 1px solid #43604a; }
+  .cat-item { display: block; padding: 3px 6px; border-bottom: 1px solid #ddd; cursor: pointer; text-decoration: none; }
+  .cat-item:hover { background: #e8f0e8; }
+  .cat-item.sel { background: #d8e8d8; font-weight: bold; }
+  .cat-item.locked { color: #997; cursor: help; }
+  .badge { font-size: 10px; color: #b33; margin-left: 4px; }
+  .preview { text-align: center; }
+  canvas { display: block; margin: 0 auto 6px; background: #fff; border: 1px solid #999; image-rendering: pixelated; }
+  button { font: 12px Tahoma; margin: 2px 1px; padding: 3px 9px; background: #eee; border: 1px solid #999; border-color: #ccc #888 #888 #ccc; cursor: pointer; }
+  button:hover { background: #e0e6f0; }
+  button.active { background: #cfe0cf; border-color: #7a9a7a; font-weight: bold; }
+  .row { margin: 3px 0; }
+  .elems { display: flex; flex-wrap: wrap; gap: 6px; max-width: 430px; }
+  .elem { text-align: center; width: 64px; cursor: pointer; border: 1px solid #ccc; background: #fff; padding: 1px; }
+  .elem:hover { border-color: #5d7a61; }
+  .elem.sel { border: 2px solid #2e6b2e; }
+  .elem img { width: 48px; height: 72px; image-rendering: pixelated; object-fit: contain; }
+  .elem .nm { font-size: 9px; display: block; height: 22px; overflow: hidden; }
+  .elem.locked { opacity: .55; cursor: help; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 4px; max-width: 430px; margin-top: 6px; }
+  .sw { width: 26px; height: 18px; border: 1px solid #666; cursor: pointer; font-size: 9px; color: #fff; text-shadow: 0 0 2px #000; display: inline-flex; align-items: center; justify-content: center; }
+  .sw.sel { border: 2px solid #d33; width: 28px; height: 20px; }
+  .gate-msg { color: #933; font-size: 11px; margin-top: 4px; }
+  textarea { font: 11px monospace; width: 98%; height: 34px; }
+  .hdr { font-weight: bold; color: #5d7a61; border-bottom: 1px dashed #bbb; padding-bottom: 2px; margin-bottom: 5px; }
+  input[type=range] { width: 120px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<h1>🐴 Конструктор окрасов — прототип coop-field</h1>
+<p class="note">Арт — референс CatWar: act0 «сидит» + act1 «ходит» (4-кадровые полосы, родная хореография [1000, 200, 200, 300] мс).
+Поза «Ходит» — сразу анимированная. Арт-файлы CatWar и kns_def.json в репозиторий игры НЕ коммитить.</p>
+
+<div class="wrap">
+  <div class="panel" id="cats" style="min-width:170px"></div>
+
+  <div class="panel preview">
+    <div class="catname">Котик (превью 2.4x)</div>
+    <canvas id="main" width="100" height="150"></canvas>
+    <div class="row">Поза: <button id="btn-sit">Сидит</button><button id="btn-walk">Ходит (анимация)</button></div>
+    <div class="row">
+      <button id="btn-random">Случайный окрас</button>
+      <button id="btn-reset">Сбросить</button>
+    </div>
+    <div class="hdr">Код окраса (24 блока)</div>
+    <div class="row"><textarea id="code-in" placeholder="вставь код и нажми «Применить код»"></textarea></div>
+    <div class="row"><button id="btn-apply">Применить код</button> <span class="note">формат: <code>id/цвет|прозр0-9</code> × 24 через пробел</span></div>
+    <div class="row"><textarea id="code-out" readonly></textarea></div>
+    <div class="note" id="skip-note" style="display:none;color:#933"></div>
+  </div>
+
+  <div class="panel" style="max-width:470px; flex:1">
+    <div class="hdr" id="slot-title">Слот</div>
+    <div id="slot-elems"></div>
+    <div id="slot-colors"></div>
+    <div id="slot-opacity" style="margin-top:6px"></div>
+    <div class="gate-msg" id="gate-note"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const M = CATWAR_MANIFEST;
+const W = 100, H = 150;
+const cv = document.getElementById('main');
+cv.style.width  = Math.round(W * 2.4) + 'px';
+cv.style.height = Math.round(H * 2.4) + 'px';
+const ctx = cv.getContext('2d');
+const buf = document.createElement('canvas'); buf.width = W; buf.height = H;
+const bctx = buf.getContext('2d');
+
+// ---------- состояние ----------
+const LS_STATE = 'coop_kns_catwar_state', LS_POSE = 'coop_kns_catwar_pose';
+function DEFAULT_STATE() {
+  return {
+    0:  { id: 1, colour: 18, opacity: 1 },  // основа: золотистый
+    15: { id: 3, colour: 18, opacity: 1 },  // хвост-основа: умеренный
+    16: { id: 1, colour: 18, opacity: 1 },  // грива-основа: умеренная
+    17: { id: 1, colour: 18, opacity: 1 },  // уши-основа: торчком
+    18: { id: 1, colour: 18, opacity: 1 },  // шерсть-основа: на щеках №1
+    1:  { id: 12, colour: 0, opacity: 1 },  // левый глаз, цвет 12
+    19: { id: 12, colour: 0, opacity: 1 },  // правый глаз
+    2:  { id: 1, colour: 18, opacity: 1 },  // передние лапы (ходьба!)
+    3:  { id: 1, colour: 18, opacity: 1 },
+    13: { id: 1, colour: 18, opacity: 1 },  // задние лапы
+    14: { id: 1, colour: 18, opacity: 1 },
+  };
+}
+let state = {}, pose = 'sit', selSlot = 0, frame = 0, animTimer = null, frameAcc = 0, lastTs = 0;
+
+function slotOf(n) { return M.slots[n]; }
+function palOf(slot) { return M.palettes[slot.palette] || M.palettes[0]; }
+function hexOf(palette, id) {
+  const p = M.palettes[palette] || [];
+  const c = p.find(x => String(x.id) === String(id));
+  return c && c.hex ? c.hex : null;
+}
+
+// ---------- файл выбранного слоя ----------
+function fileFor(slot, st, act) {
+  const actDir = 'act' + act;
+  const f = slot.file;
+  if (slot.kind === 'base')   return f.replace('{act}', actDir).replace('{colour}', st.colour || 1);
+  if (slot.kind === 'form')   return f.replace('{act}', actDir).replace('{id}', st.id).replace('{colour}', st.colour || 1);
+  if (slot.kind === 'sprite') return f.replace('{act}', actDir).replace('{id}', st.id);
+  return f.replace('{act}', actDir).replace('{id}', st.id);
+}
+
+// ---------- кеш картинок ----------
+const images = {};
+function getImage(src) {
+  if (images[src] !== undefined) return images[src];
+  const im = new Image();
+  im.onload = () => render();
+  im.onerror = () => { images[src] = null; };
+  im.src = M.assetRoot + src;
+  images[src] = im;
+  return im;
+}
+
+// ---------- рендер ----------
+function drawLayer(img, st, tintHex, strip) {
+  bctx.clearRect(0, 0, W, H);
+  bctx.globalCompositeOperation = 'source-over';
+  bctx.globalAlpha = st.opacity !== undefined ? st.opacity : 1;
+  const isStrip = strip && img.width >= M.walk.frameW * 2;
+  if (isStrip) bctx.drawImage(img, frame * M.walk.frameW, 0, M.walk.frameW, H, 0, 0, W, H);
+  else bctx.drawImage(img, 0, 0, W, H);
+  if (tintHex) { // multiply-тонировка: сохраняет авторские тени элементов
+    bctx.globalCompositeOperation = 'multiply';
+    bctx.fillStyle = tintHex;
+    bctx.fillRect(0, 0, W, H);
+    bctx.globalCompositeOperation = 'destination-in';
+    const src = isStrip ? 0 : 0;
+    if (isStrip) bctx.drawImage(img, frame * M.walk.frameW, 0, M.walk.frameW, H, 0, 0, W, H);
+    else bctx.drawImage(img, 0, 0, W, H);
+  }
+  ctx.drawImage(buf, 0, 0);
+  bctx.globalAlpha = 1;
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  let missing = 0;
+  for (const num of M.zOrder) {
+    const st = state[num];
+    if (!st || !st.id) continue;
+    const slot = slotOf(num);
+    if (!slot) continue;
+    const src = fileFor(slot, st, pose === 'walk' ? 1 : 0);
+    const im = getImage(src);
+    if (!im || !im.complete || im.naturalWidth === 0) { continue; }
+    const strip = pose === 'walk'; // act1: полосы 400×150 → кадры
+    const tint = slot.kind === 'element' ? (hexOf(0, st.colour) || null) : null;
+    drawLayer(im, st, tint, strip);
+  }
+  const note = document.getElementById('skip-note');
+  note.style.display = 'none'; note.textContent = '';
+  updateCodeBox();
+}
+
+// ---------- walk-анимация ----------
+function startAnim() { stopAnim(); frame = 0; frameAcc = 0; lastTs = 0; animTimer = setInterval(tick, 40); }
+function stopAnim() { if (animTimer) { clearInterval(animTimer); animTimer = null; } }
+function tick() {
+  const now = Date.now();
+  const dt = lastTs ? now - lastTs : 40;
+  lastTs = now;
+  frameAcc += dt;
+  const ms = M.walk.frameMs;
+  let guard = 0;
+  while (frameAcc >= ms[frame] && guard++ < 10) { frameAcc -= ms[frame]; frame = (frame + 1) % ms.length; }
+  render();
+}
+function setPose(newPose) {
+  if (newPose !== 'sit' && newPose !== 'walk') return;
+  if (pose === newPose) { if (newPose === 'walk' && !animTimer) startAnim(); return; }
+  pose = newPose;
+  try { localStorage.setItem(LS_POSE, pose); } catch (e) {}
+  frame = 0;
+  stopAnim();
+  if (pose === 'walk') startAnim();
+  render();
+  updatePoseButtons();
+}
+function updatePoseButtons() {
+  document.getElementById('btn-sit').classList.toggle('active', pose === 'sit');
+  document.getElementById('btn-walk').classList.toggle('active', pose === 'walk');
+}
+
+// ---------- категории (как в KNS: Основа / Шея и морда / Туловище / Лапы и хвост) ----------
+function slotAvailable(slot) {
+  if (slot.kind === 'base') return true;
+  return slot.elements.some(e => e.ok);
+}
+function buildCategories() {
+  const cats = document.getElementById('cats');
+  cats.innerHTML = '';
+  for (const block of M.blocks) {
+    const title = block[0];
+    const g = document.createElement('div');
+    g.className = 'cat-group';
+    const t = document.createElement('div');
+    t.className = 'cat-title';
+    t.textContent = title;
+    g.appendChild(t);
+    for (const n of block.slice(1).flatMap(x => Array.isArray(x) ? x : [x])) {
+      const slot = slotOf(n);
+      if (!slot) continue;
+      const a = document.createElement('a');
+      a.className = 'cat-item';
+      a.textContent = slot.name;
+      if (!slotAvailable(slot)) {
+        a.classList.add('locked');
+        a.innerHTML += ' <span class="badge">гейт</span>';
+        a.title = 'У CatWar слот за гейтом: файлы не отдаются. В coop-field — собственный арт-пак.';
+      }
+      a.onclick = () => { selSlot = n; buildCategories(); buildSlotPanel(); };
+      if (selSlot === n) a.classList.add('sel');
+      g.appendChild(a);
+    }
+    cats.appendChild(g);
+  }
+}
+
+// ---------- панель слота ----------
+function thumbSrc(slot, el) {
+  const cur = state[slot.num] || {};
+  if (slot.kind === 'base')   return fileFor(slot, { colour: el.id }, 0);
+  if (slot.kind === 'form')   return slot.file.replace('{act}', 'act0').replace('{id}', el.id).replace('{colour}', cur.colour || 18);
+  if (slot.kind === 'sprite') return slot.file.replace('{act}', 'act0').replace('{id}', el.id);
+  return slot.file.replace('{act}', 'act0').replace('{id}', el.id);
+}
+function buildSlotPanel() {
+  const slot = slotOf(selSlot);
+  const st = state[slot.num];
+  const elems = document.getElementById('slot-elems');
+  const colorsDiv = document.getElementById('slot-colors');
+  const opDiv = document.getElementById('slot-opacity');
+  const gate = document.getElementById('gate-note');
+  const kindNames = { base: 'основа · основной цвет', form: 'основа · форма', sprite: 'спрайт · цвет', element: 'элемент' };
+  document.getElementById('slot-title').textContent = 'Слот ' + slot.num + ' · ' + slot.name + ' (' + kindNames[slot.kind] + ')';
+
+  // элементы
+  elems.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'elems';
+  if (slot.kind === 'element' || slot.kind === 'form') {
+    const none = document.createElement('div');
+    none.className = 'elem' + (!st || !st.id ? ' sel' : '');
+    none.innerHTML = '<div style="height:72px;display:flex;align-items:center;justify-content:center;color:#999">нет</div><span class="nm">— нет —</span>';
+    none.onclick = () => { delete state[slot.num]; persist(); render(); buildSlotPanel(); };
+    grid.appendChild(none);
+  }
+  for (const el of slot.elements) {
+    const cur = st && String(st.id) === String(el.id);
+    const d = document.createElement('div');
+    d.className = 'elem' + (cur ? ' sel' : '') + (el.ok === false ? ' locked' : '');
+    d.innerHTML = '<img src="' + M.assetRoot + thumbSrc(slot, el) + '" onerror="this.style.visibility=\'hidden\'">'
+      + '<span class="nm">' + (el.name || '#' + el.id) + '</span>';
+    if (el.ok === false) {
+      d.title = 'Гейт CatWar — файл не отдаётся. В coop-field — собственный арт.';
+    } else {
+      d.onclick = () => {
+        if (slot.kind === 'sprite') state[slot.num] = { id: el.id, colour: 0, opacity: 1 };
+        else state[slot.num] = { id: el.id, colour: (st && st.colour) || 18, opacity: (st && st.opacity) || 1 };
+        persist(); render(); buildSlotPanel();
+      };
+    }
+    grid.appendChild(d);
+  }
+  elems.appendChild(grid);
+
+  // цвета
+  colorsDiv.innerHTML = '';
+  if (slot.kind === 'base' || slot.kind === 'form' || slot.kind === 'element') {
+    const palIdx = (slot.kind === 'element') ? 0 : slot.palette;
+    const hdr = document.createElement('div');
+    hdr.className = 'hdr';
+    hdr.textContent = 'Цвет (палитра ' + palIdx + ')';
+    colorsDiv.appendChild(hdr);
+    const sw = document.createElement('div');
+    sw.className = 'swatches';
+    for (const c of (M.palettes[palIdx] || M.palettes[0]).colours) {
+      if (!c.hex) continue;
+      const s = document.createElement('div');
+      s.className = 'sw' + (st && String(st.colour) === String(c.id) ? ' sel' : '');
+      s.style.background = c.hex;
+      s.title = c.name + ' (id ' + c.id + ')';
+      s.onclick = () => {
+        if (!state[slot.num]) state[slot.num] = { id: firstOkId(slot), colour: c.id, opacity: 1 };
+        else state[slot.num].colour = c.id;
+        persist(); render(); buildSlotPanel();
+      };
+      sw.appendChild(s);
+    }
+    colorsDiv.appendChild(sw);
+  }
+  if (slot.kind === 'sprite' && st) {
+    const info = document.createElement('div');
+    info.className = 'note';
+    info.textContent = 'Цвет глаз задаётся спрайтом: выбери цвет в списке элементов слева.';
+    colorsDiv.appendChild(info);
+  }
+
+  // прозрачность
+  if (slot.kind === 'element' && st && st.id) {
+    opDiv.innerHTML = '<label>Прозрачность <input type="range" id="op-range" min="0" max="1" step="0.05" value="' + (st.opacity !== undefined ? st.opacity : 1) + '"> <span id="op-val"></span></label>';
+    const r = document.getElementById('op-range');
+    const v = document.getElementById('op-val');
+    v.textContent = Math.round(r.value * 100) + '%';
+    r.oninput = () => { st.opacity = +r.value; v.textContent = Math.round(r.value * 100) + '%'; persist(); render(); };
+  } else opDiv.innerHTML = '';
+
+  const allLocked = slot.kind === 'element' && slot.elements.length && slot.elements.every(e => e.ok === false);
+  gate.textContent = allLocked ? 'Слот закрыт гейтом CatWar (файлы не отдаются). В coop-field этот слой рисуем собственным арт-паком.' : '';
+}
+function firstOkId(slot) { const ok = slot.elements.find(e => e.ok !== false); return ok ? ok.id : 1; }
+
+// ---------- код окраса ----------
+function encodeCode() {
+  const parts = [];
+  for (let n = 0; n < 24; n++) {
+    const st = state[n];
+    if (st && st.id) {
+      const op = st.opacity !== undefined ? st.opacity : 1;
+      parts.push(st.id + '/' + (st.colour === undefined || st.colour === null || st.colour === 0 ? 1 : st.colour) + '|' + Math.round(op * 9));
+    } else parts.push('0/0|9');
+  }
+  return parts.join(' ');
+}
+function applyCode(raw) {
+  const blocks = raw.trim().split(/\s+/).filter(Boolean);
+  const next = {};
+  let bad = 0;
+  for (let n = 0; n < Math.min(blocks.length, 24); n++) {
+    const m = blocks[n].match(/^(\d+)\/(\d+)\|(\d+)$/);
+    if (m && +m[1] > 0) {
+      next[n] = { id: m[1], colour: m[2], opacity: Math.max(0.05, Math.min(1, +m[3] / 9)) };
+      const slot = slotOf(n);
+      // для глах спрайтов id = цвет
+    } else if (blocks[n] === '0/0|9' || blocks[n] === '0') {
+      // пусто
+    } else bad++;
+  }
+  state = next;
+  persist(); render(); buildCategories(); buildSlotPanel();
+  if (bad) alert('Не удалось разобрать блоков: ' + bad);
+}
+
+// ---------- прочее ----------
+function persist() { try { localStorage.setItem(LS_STATE, JSON.stringify(state)); } catch (e) {} }
+function randomize() {
+  const next = {};
+  const baseCol = String(1 + Math.floor(Math.random() * 24));
+  for (const slot of M.slots) {
+    const ok = slot.elements.filter(e => e.ok !== false);
+    if (!ok.length) continue;
+    const el = ok[Math.floor(Math.random() * ok.length)];
+    if (slot.kind === 'sprite') next[slot.num] = { id: el.id, colour: 0, opacity: 1 };
+    else {
+      let colour;
+      if (slot.kind === 'base' || slot.kind === 'form') colour = baseCol;
+      else if (slot.num === 0) colour = baseCol;
+      else colour = String(1 + Math.floor(Math.random() * 24));
+      next[slot.num] = { id: el.id, colour, opacity: 1 };
+    }
+  }
+  // хвост/грива/уши/шерсть — в тон основы (как у CatWar по умолчанию)
+  for (const n of [15, 16, 17, 18]) if (next[n]) next[n].colour = baseCol;
+  state = next; persist(); render(); buildCategories(); buildSlotPanel();
+}
+function resetAll() { state = DEFAULT_STATE(); persist(); render(); buildCategories(); buildSlotPanel(); }
+function updateCodeBox() { document.getElementById('code-out').value = encodeCode(); }
+
+document.getElementById('btn-walk').onclick = () => setPose('walk');
+document.getElementById('btn-sit').onclick = () => setPose('sit');
+document.getElementById('btn-random').onclick = randomize;
+document.getElementById('btn-reset').onclick = resetAll;
+document.getElementById('btn-apply').onclick = () => applyCode(document.getElementById('code-in').value);
+
+// ---------- init ----------
+try { const raw = localStorage.getItem(LS_STATE); if (raw) state = JSON.parse(raw); } catch (e) {}
+if (!Object.keys(state).length) state = DEFAULT_STATE();
+try { const p = localStorage.getItem(LS_POSE); if (p === 'sit' || p === 'walk') pose = p; } catch (e) {}
+buildCategories();
+buildSlotPanel();
+updatePoseButtons();
+render();
+if (pose === 'walk') startAnim();
+</script>
+</body>
+</html>
