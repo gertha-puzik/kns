@@ -128,13 +128,24 @@ function hexOf(palette, id) {
 }
 
 // ---------- файл выбранного слоя ----------
-function fileFor(slot, st, act) {
+// элемент-слоты с родителем-«формой»: 6=полосы хвоста (от вида хвоста 15),
+// 7/8=уши-накладки (от вида ушей 17), 20=грива (16), 21=шерсть (18)
+const FORMPARENT = { 6: 15, 7: 17, 8: 17, 20: 16, 21: 18 };
+function formOf(num) { // id вида родительской формы или '1' (CatWar default)
+  const p = FORMPARENT[num];
+  if (!p) return '1';
+  const L = state[p];
+  const f = L && L[0];
+  return f && f.id !== undefined && f.id !== null ? String(f.id) : '1';
+}
+function fileFor(slot, st, act, form) {
   const actDir = 'act' + act;
   const f = slot.file;
+  const fv = form !== undefined && form !== null ? String(form) : '1';
   if (slot.kind === 'base')   return f.replace('{act}', actDir).replace('{colour}', st.colour || 1);
   if (slot.kind === 'form')   return f.replace('{act}', actDir).replace('{id}', st.id).replace('{colour}', st.colour || 1);
-  if (slot.kind === 'sprite') return f.replace('{act}', actDir).replace('{id}', st.id);
-  return f.replace('{act}', actDir).replace('{id}', st.id);
+  if (slot.kind === 'sprite') return f.replace('{act}', actDir).replace('{id}', st.id).replace('{form}', fv);
+  return f.replace('{act}', actDir).replace('{id}', st.id).replace('{form}', fv);
 }
 
 // ---------- кеш картинок ----------
@@ -181,19 +192,20 @@ function render() {
     const act = pose === 'walk' ? 1 : 0;
     const strip = pose === 'walk'; // act1: полосы 400×150 → кадры
     // слои слота рисуются по порядку — порядок = порядок в коде окраса (CatWar)
+    const form = FORMPARENT[num] ? formOf(num) : undefined;
     for (const st of layers) {
       let src;
       if (st.id !== undefined && st.id !== null) {
-        src = fileFor(slot, st, act);
+        src = fileFor(slot, st, act, form);
       } else if (slot.kind === 'base') {
         // id-less слой на «Base» = сплошная заливка телом: base_color_{colour}
-        src = fileFor(slot, { colour: st.colour }, act);
+        src = fileFor(slot, { colour: st.colour }, act, form);
       } else if (slot.kind === 'sprite') {
         // id-less на глазах: CatWar кодирует цвет глаза числом без id → файл спрайта с этим номером
-        src = fileFor(slot, { id: st.colour }, act);
+        src = fileFor(slot, { id: st.colour }, act, form);
       } else {
         // id-less на form/element-слоте: у CatWar это форма-«1» с цветом (img = selected.id ?? "1")
-        src = fileFor(slot, { id: '1', colour: st.colour }, act);
+        src = fileFor(slot, { id: '1', colour: st.colour }, act, form);
       }
       const im = getImage(src);
       if (!im || !im.complete || im.naturalWidth === 0) { missing++; continue; }
@@ -276,10 +288,11 @@ function buildCategories() {
 // ---------- панель слота ----------
 function thumbSrc(slot, el) {
   const cur = activeLayer(slot.num) || {};
+  const fv = FORMPARENT[slot.num] ? formOf(slot.num) : '1';
   if (slot.kind === 'base')   return fileFor(slot, { colour: el.id }, 0);
   if (slot.kind === 'form')   return slot.file.replace('{act}', 'act0').replace('{id}', el.id).replace('{colour}', cur.colour || 18);
   if (slot.kind === 'sprite') return slot.file.replace('{act}', 'act0').replace('{id}', el.id);
-  return slot.file.replace('{act}', 'act0').replace('{id}', el.id);
+  return slot.file.replace('{act}', 'act0').replace('{id}', el.id).replace('{form}', fv);
 }
 function buildSlotPanel() {
   const slot = slotOf(selSlot);
@@ -428,6 +441,8 @@ function buildSlotPanel() {
 function firstOkId(slot) { const ok = slot.elements.find(e => e.ok !== false); return ok ? ok.id : 1; }
 
 // ---------- код окраса (грамматика CatWar: блок = слой-слой-…, слой = id/цвет|p или цвет|p; 0 = пусто; p=0..10 → 50..100%) ----------
+// ВАЖНО (проверено на реальном коде заказчицы): вид хвоста/гривы/ушей/шерсти (id блоков 15-18) CatWar КОДИРУЕТ в коде
+// («6/18» = хвост Беличий), поэтому id форм-слотов пишем как есть — roundtrip байт-в-байт.
 function encodeCode() {
   const blocks = [];
   for (let n = 0; n < 24; n++) {
