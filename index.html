@@ -108,7 +108,8 @@ let state = {}, pose = 'sit', selSlot = 0, frame = 0, animTimer = null, frameAcc
 function slotOf(n) { return M.slots[n]; }
 function palOf(slot) { return M.palettes[slot.palette] || M.palettes[0]; }
 function hexOf(palette, id) {
-  const p = M.palettes[palette] || [];
+  const raw = M.palettes[palette];
+  const p = Array.isArray(raw) ? raw : (raw && raw.colours ? raw.colours : []);
   const c = p.find(x => String(x.id) === String(id));
   return c && c.hex ? c.hex : null;
 }
