@@ -24,9 +24,10 @@ footer{color:#888;font-size:11px;margin-top:24px;}
 </style></head><body><div class="wrap">
 <h1>🐾 KNS — генерации базового окраса</h1>
 <div class="sub">Все 26 выдач image-модели с картинками (+1 текстовый сбой M1_sheet) от google/gemini-3.1-flash-image через Selectel ИИ-роутер; производные кадры 100×150 (белый фон → прозрачность, опора у нижнего края); живые walk-циклы на фоне поля abnocw (#616517, текстура травы/кустов — скрин реального поля). Часть промптов-ТЗ составлял Claude Sonnet 5.5. Интервал 280 мс/кадр. 5 ноября 2026. Файл автономный.</div>
+<div style="background:#eef7ee;border:1px solid #cde5cd;border-radius:10px;padding:10px 14px;color:#1a5c1a;font-size:14px;margin-bottom:16px">&#10003; Итог гонки — согласованная база окраса: <b>M2 — «ближе к милоте P2/R»</b> (выбор заказчицы). Остальные серии и вариации M2-A/B/C — в сворачиваемом блоке гонки ниже.</div>
 <div id="cards"></div>
 <details id="race" style="margin-top:26px;border:1px solid #d8d2c2;border-radius:14px;background:#f6f2e8;padding:10px 16px">
-<summary style="cursor:pointer;font-weight:600;color:#6b5d3f;font-size:15px;padding:6px 0">🏁 Гонка базовых окрасов — 8 отсеянных серий (A, B, C, P1, P2, K, R, M1) — клик, чтобы развернуть</summary>
+<summary style="cursor:pointer;font-weight:600;color:#6b5d3f;font-size:15px;padding:6px 0">🏁 Гонка базовых окрасов — 11 серий (A, B, C, P1, P2, K, R, M1 + вариации M2-A/B/C) — клик, чтобы развернуть</summary>
 <div id="rest-cards"></div>
 </details>
 
@@ -92,8 +93,8 @@ function cardHTML(s, idx) {
   return html;
 }
 function render() {
-  const W = DATA.filter(s => s.name.indexOf('M2') === 0 || s.name.indexOf('M2') === 2);
-  const REST = DATA.filter(s => s.name.indexOf('M2') < 0);
+  const W = DATA.filter(s => s.name.indexOf('M2') === 0 && s.name.charAt(2) !== '-');
+  const REST = DATA.filter(s => !W.includes(s));
   document.getElementById('cards').innerHTML = W.map(s => cardHTML(s, DATA.indexOf(s))).join('');
   document.getElementById('rest-cards').innerHTML = REST.map(s => cardHTML(s, DATA.indexOf(s))).join('');
   DATA.forEach((s, idx) => {
