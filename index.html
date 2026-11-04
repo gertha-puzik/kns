@@ -60,8 +60,8 @@
       <button id="btn-reset">Сбросить</button>
     </div>
     <div class="hdr">Код окраса (24 блока)</div>
-    <div class="row"><textarea id="code-in" placeholder="вставь код и нажми «Применить код»"></textarea></div>
-    <div class="row"><button id="btn-apply">Применить код</button> <span class="note">формат: <code>id/цвет|прозр0-9</code> × 24 через пробел</span></div>
+    <div class="row"><textarea id="code-in" placeholder="вставь код из CatWar и нажми «Применить код»"></textarea></div>
+    <div class="row"><button id="btn-apply">Применить код</button> <span class="note">формат CatWar: блок = <code>слой-слой-…</code>, слой = <code>id/цвет|прозр0-10</code> или <code>цвет|прозр0-10</code>; <code>0</code> = пусто; |p → 50..100%</span></div>
     <div class="row"><textarea id="code-out" readonly></textarea></div>
     <div class="note" id="skip-note" style="display:none;color:#933"></div>
   </div>
@@ -90,20 +90,33 @@ const bctx = buf.getContext('2d');
 const LS_STATE = 'coop_kns_catwar_state', LS_POSE = 'coop_kns_catwar_pose';
 function DEFAULT_STATE() {
   return {
-    0:  { id: 1, colour: 18, opacity: 1 },  // основа: золотистый
-    15: { id: 3, colour: 18, opacity: 1 },  // хвост-основа: умеренный
-    16: { id: 1, colour: 18, opacity: 1 },  // грива-основа: умеренная
-    17: { id: 1, colour: 18, opacity: 1 },  // уши-основа: торчком
-    18: { id: 1, colour: 18, opacity: 1 },  // шерсть-основа: на щеках №1
-    1:  { id: 12, colour: 0, opacity: 1 },  // левый глаз, цвет 12
-    19: { id: 12, colour: 0, opacity: 1 },  // правый глаз
-    2:  { id: 1, colour: 18, opacity: 1 },  // передние лапы (ходьба!)
-    3:  { id: 1, colour: 18, opacity: 1 },
-    13: { id: 1, colour: 18, opacity: 1 },  // задние лапы
-    14: { id: 1, colour: 18, opacity: 1 },
+    0:  [{ id: 1, colour: 18, opacity: 1 }],  // основа: золотистый
+    15: [{ id: 3, colour: 18, opacity: 1 }],  // хвост-основа: умеренный
+    16: [{ id: 1, colour: 18, opacity: 1 }],  // грива-основа: умеренная
+    17: [{ id: 1, colour: 18, opacity: 1 }],  // уши-основа: торчком
+    18: [{ id: 1, colour: 18, opacity: 1 }],  // шерсть-основа: на щеках №1
+    1:  [{ id: 12, colour: 0, opacity: 1 }],  // левый глаз, цвет 12
+    19: [{ id: 12, colour: 0, opacity: 1 }],  // правый глаз
+    2:  [{ id: 1, colour: 18, opacity: 1 }],  // передние лапы (ходьба!)
+    3:  [{ id: 1, colour: 18, opacity: 1 }],
+    13: [{ id: 1, colour: 18, opacity: 1 }],  // задние лапы
+    14: [{ id: 1, colour: 18, opacity: 1 }],
   };
 }
-let state = {}, pose = 'sit', selSlot = 0, frame = 0, animTimer = null, frameAcc = 0, lastTs = 0;
+// state[n] = [ {id?, colour, opacity}, ... ] — слои слота в порядке наложения (грамматика CatWar)
+let state = {}, layerSel = {};
+let pose = 'sit', selSlot = 0, frame = 0, animTimer = null, frameAcc = 0, lastTs = 0;
+
+// код прозрачности CatWar: |p, p=0..10 → 50%..100%; у полной (100%) суффикс не пишется
+function opFromCode(p) { return Math.max(0.05, Math.min(1, (Number(p) * 5 + 50) / 100)); }
+function opToCode(f) { return Math.max(0, Math.min(10, Math.round(((f !== undefined ? f : 1) * 100 - 50) / 5))); }
+function layersOf(n) { return state[n] || []; }
+function activeLayer(n) {
+  const L = layersOf(n);
+  if (!L.length) return null;
+  if (layerSel[n] === undefined || layerSel[n] >= L.length || layerSel[n] < 0) layerSel[n] = 0;
+  return L[layerSel[n]];
+}
 
 function slotOf(n) { return M.slots[n]; }
 function palOf(slot) { return M.palettes[slot.palette] || M.palettes[0]; }
@@ -161,19 +174,38 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   let missing = 0;
   for (const num of M.zOrder) {
-    const st = state[num];
-    if (!st || !st.id) continue;
+    const layers = state[num];
+    if (!layers || !layers.length) continue;
     const slot = slotOf(num);
     if (!slot) continue;
-    const src = fileFor(slot, st, pose === 'walk' ? 1 : 0);
-    const im = getImage(src);
-    if (!im || !im.complete || im.naturalWidth === 0) { continue; }
+    const act = pose === 'walk' ? 1 : 0;
     const strip = pose === 'walk'; // act1: полосы 400×150 → кадры
-    const tint = slot.kind === 'element' ? (hexOf(0, st.colour) || null) : null;
-    drawLayer(im, st, tint, strip);
+    // слои слота рисуются по порядку — порядок = порядок в коде окраса (CatWar)
+    for (const st of layers) {
+      let src;
+      if (st.id !== undefined && st.id !== null) {
+        src = fileFor(slot, st, act);
+      } else if (slot.kind === 'base') {
+        // id-less слой на «Base» = сплошная заливка телом: base_color_{colour}
+        src = fileFor(slot, { colour: st.colour }, act);
+      } else if (slot.kind === 'sprite') {
+        // id-less на глазах: CatWar кодирует цвет глаза числом без id → файл спрайта с этим номером
+        src = fileFor(slot, { id: st.colour }, act);
+      } else {
+        // id-less на form/element-слоте: у CatWar это форма-«1» с цветом (img = selected.id ?? "1")
+        src = fileFor(slot, { id: '1', colour: st.colour }, act);
+      }
+      const im = getImage(src);
+      if (!im || !im.complete || im.naturalWidth === 0) { missing++; continue; }
+      const tint = slot.kind === 'element' && st.colour !== 0 ? (hexOf(0, st.colour) || null) : null;
+      drawLayer(im, st, tint, strip);
+    }
   }
   const note = document.getElementById('skip-note');
-  note.style.display = 'none'; note.textContent = '';
+  if (missing) {
+    note.style.display = 'block';
+    note.textContent = 'Пропущено слоёв: ' + missing + ' — нет файлов в арт-паке (гейты CatWar: усы 22, нос 23 — файлы не отдаются; либо арт ещё не сгенерирован).';
+  } else { note.style.display = 'none'; note.textContent = ''; }
   updateCodeBox();
 }
 
@@ -243,7 +275,7 @@ function buildCategories() {
 
 // ---------- панель слота ----------
 function thumbSrc(slot, el) {
-  const cur = state[slot.num] || {};
+  const cur = activeLayer(slot.num) || {};
   if (slot.kind === 'base')   return fileFor(slot, { colour: el.id }, 0);
   if (slot.kind === 'form')   return slot.file.replace('{act}', 'act0').replace('{id}', el.id).replace('{colour}', cur.colour || 18);
   if (slot.kind === 'sprite') return slot.file.replace('{act}', 'act0').replace('{id}', el.id);
@@ -251,7 +283,8 @@ function thumbSrc(slot, el) {
 }
 function buildSlotPanel() {
   const slot = slotOf(selSlot);
-  const st = state[slot.num];
+  const st = activeLayer(slot.num);
+  const L = layersOf(slot.num);
   const elems = document.getElementById('slot-elems');
   const colorsDiv = document.getElementById('slot-colors');
   const opDiv = document.getElementById('slot-opacity');
@@ -259,15 +292,69 @@ function buildSlotPanel() {
   const kindNames = { base: 'основа · основной цвет', form: 'основа · форма', sprite: 'спрайт · цвет', element: 'элемент' };
   document.getElementById('slot-title').textContent = 'Слот ' + slot.num + ' · ' + slot.name + ' (' + kindNames[slot.kind] + ')';
 
-  // элементы
+  // ---- СЛОИ слота (грамматика CatWar: слоёв может быть несколько, порядок = порядок наложения) ----
+  const layersDiv = document.createElement('div');
+  layersDiv.className = 'hdr';
+  layersDiv.textContent = 'Слои слота: ' + (L.length || 0) + (L.length > 1 ? ' (каждый со своим цветом и прозрачностью)' : '');
   elems.innerHTML = '';
+  elems.appendChild(layersDiv);
+  const chips = document.createElement('div');
+  chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 8px';
+  L.forEach((ly, i) => {
+    const c = document.createElement('button');
+    const p = Math.round((ly.opacity !== undefined ? ly.opacity : 1) * 100);
+    const name = (ly.id !== undefined && ly.id !== null) ? (ly.id + '/' + ly.colour) : ('цвет ' + ly.colour);
+    c.textContent = '#' + i + ' · ' + name + ' · ' + p + '%';
+    c.style.cssText = 'font-size:12px;padding:2px 7px;cursor:pointer;border:1px solid ' + (layerSel[slot.num] === i ? '#e35d17' : '#b8a087') + ';background:' + (layerSel[slot.num] === i ? '#fdeadd' : '#fff') + ';border-radius:8px';
+    c.onclick = () => { layerSel[slot.num] = i; persist(); render(); buildSlotPanel(); };
+    chips.appendChild(c);
+  });
+  elems.appendChild(chips);
+  const ops = document.createElement('div');
+  ops.style.cssText = 'display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap';
+  const mkBtn = (label, title, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label; b.title = title;
+    b.onclick = fn;
+    return b;
+  };
+  ops.appendChild(mkBtn('+ слой', 'Добавить слой в этот слот (как у CatWar: до 8 слоёв, накладываются по порядку)', () => {
+    if (!state[slot.num]) state[slot.num] = [];
+    state[slot.num].push({ id: firstOkId(slot), colour: 18, opacity: 1 });
+    layerSel[slot.num] = state[slot.num].length - 1;
+    persist(); render(); buildSlotPanel();
+  }));
+  ops.appendChild(mkBtn('− слой', 'Удалить выбранный слой', () => {
+    if (!L.length) return;
+    L.splice(layerSel[slot.num] || 0, 1);
+    layerSel[slot.num] = Math.max(0, (layerSel[slot.num] || 0) - 1);
+    if (!L.length) delete state[slot.num];
+    persist(); render(); buildSlotPanel();
+  }));
+  ops.appendChild(mkBtn('↑', 'Поднять выбранный слой (рисуется позже = поверх)', () => {
+    const i = layerSel[slot.num] || 0;
+    if (i + 1 >= L.length) return;
+    [L[i], L[i + 1]] = [L[i + 1], L[i]];
+    layerSel[slot.num] = i + 1;
+    persist(); render(); buildSlotPanel();
+  }));
+  ops.appendChild(mkBtn('↓', 'Опустить выбранный слой', () => {
+    const i = layerSel[slot.num] || 0;
+    if (i === 0) return;
+    [L[i], L[i - 1]] = [L[i - 1], L[i]];
+    layerSel[slot.num] = i - 1;
+    persist(); render(); buildSlotPanel();
+  }));
+  elems.appendChild(ops);
+
+  // элементы (применяются к ВЫБРАННОМУ слою; если слоёв нет — создаётся первый)
   const grid = document.createElement('div');
   grid.className = 'elems';
   if (slot.kind === 'element' || slot.kind === 'form') {
     const none = document.createElement('div');
-    none.className = 'elem' + (!st || !st.id ? ' sel' : '');
+    none.className = 'elem' + (!L.length ? ' sel' : '');
     none.innerHTML = '<div style="height:72px;display:flex;align-items:center;justify-content:center;color:#999">нет</div><span class="nm">— нет —</span>';
-    none.onclick = () => { delete state[slot.num]; persist(); render(); buildSlotPanel(); };
+    none.onclick = () => { delete state[slot.num]; delete layerSel[slot.num]; persist(); render(); buildSlotPanel(); };
     grid.appendChild(none);
   }
   for (const el of slot.elements) {
@@ -280,8 +367,10 @@ function buildSlotPanel() {
       d.title = 'Гейт CatWar — файл не отдаётся. В coop-field — собственный арт.';
     } else {
       d.onclick = () => {
-        if (slot.kind === 'sprite') state[slot.num] = { id: el.id, colour: 0, opacity: 1 };
-        else state[slot.num] = { id: el.id, colour: (st && st.colour) || 18, opacity: (st && st.opacity) || 1 };
+        if (!state[slot.num]) state[slot.num] = [];
+        const a = activeLayer(slot.num);
+        const base = a ? { id: el.id, colour: a.colour, opacity: a.opacity } : { id: el.id, colour: 18, opacity: 1 };
+        if (a) Object.assign(a, base); else state[slot.num].push(base);
         persist(); render(); buildSlotPanel();
       };
     }
@@ -289,13 +378,13 @@ function buildSlotPanel() {
   }
   elems.appendChild(grid);
 
-  // цвета
+  // цвета — выбранному слою
   colorsDiv.innerHTML = '';
   if (slot.kind === 'base' || slot.kind === 'form' || slot.kind === 'element') {
     const palIdx = (slot.kind === 'element') ? 0 : slot.palette;
     const hdr = document.createElement('div');
     hdr.className = 'hdr';
-    hdr.textContent = 'Цвет (палитра ' + palIdx + ')';
+    hdr.textContent = 'Цвет выбранного слоя (палитра ' + palIdx + ')';
     colorsDiv.appendChild(hdr);
     const sw = document.createElement('div');
     sw.className = 'swatches';
@@ -306,64 +395,92 @@ function buildSlotPanel() {
       s.style.background = c.hex;
       s.title = c.name + ' (id ' + c.id + ')';
       s.onclick = () => {
-        if (!state[slot.num]) state[slot.num] = { id: firstOkId(slot), colour: c.id, opacity: 1 };
-        else state[slot.num].colour = c.id;
+        if (!state[slot.num]) state[slot.num] = [];
+        const a = activeLayer(slot.num);
+        if (a) a.colour = c.id; else state[slot.num].push({ id: firstOkId(slot), colour: c.id, opacity: 1 });
         persist(); render(); buildSlotPanel();
       };
       sw.appendChild(s);
     }
     colorsDiv.appendChild(sw);
   }
-  if (slot.kind === 'sprite' && st) {
+  if (slot.kind === 'sprite' && st && st.id === undefined) {
     const info = document.createElement('div');
     info.className = 'note';
-    info.textContent = 'Цвет глаз задаётся спрайтом: выбери цвет в списке элементов слева.';
+    info.textContent = 'Слой без id: цвет глаза задаётся самим числом (CatWar кодирует цвет номером файла).';
     colorsDiv.appendChild(info);
   }
 
-  // прозрачность
-  if (slot.kind === 'element' && st && st.id) {
-    opDiv.innerHTML = '<label>Прозрачность <input type="range" id="op-range" min="0" max="1" step="0.05" value="' + (st.opacity !== undefined ? st.opacity : 1) + '"> <span id="op-val"></span></label>';
+  // прозрачность — выбранному слою (у CatWar: любой слой может быть полупрозрачным, |0..|10 → 50..100%)
+  if (L.length && st) {
+    const p = opToCode(st.opacity);
+    opDiv.innerHTML = '<label>Прозрачность выбранного слоя <input type="range" id="op-range" min="0" max="10" step="1" value="' + p + '"> <span id="op-val"></span></label>'
+      + '<div class="note">Код пишет |' + p + ' → ' + Math.round(opFromCode(p) * 100) + '% (|0..|10 → 50..100%, полная — без суффикса)</div>';
     const r = document.getElementById('op-range');
     const v = document.getElementById('op-val');
-    v.textContent = Math.round(r.value * 100) + '%';
-    r.oninput = () => { st.opacity = +r.value; v.textContent = Math.round(r.value * 100) + '%'; persist(); render(); };
-  } else opDiv.innerHTML = '';
+    v.textContent = Math.round(opFromCode(r.value) * 100) + '%';
+    r.oninput = () => { st.opacity = opFromCode(r.value); v.textContent = Math.round(st.opacity * 100) + '%'; persist(); render(); };
+  } else opDiv.innerHTML = '<div class="note">Прозрачность доступна, когда в слоте есть хотя бы один слой.</div>';
 
   const allLocked = slot.kind === 'element' && slot.elements.length && slot.elements.every(e => e.ok === false);
   gate.textContent = allLocked ? 'Слот закрыт гейтом CatWar (файлы не отдаются). В coop-field этот слой рисуем собственным арт-паком.' : '';
 }
 function firstOkId(slot) { const ok = slot.elements.find(e => e.ok !== false); return ok ? ok.id : 1; }
 
-// ---------- код окраса ----------
+// ---------- код окраса (грамматика CatWar: блок = слой-слой-…, слой = id/цвет|p или цвет|p; 0 = пусто; p=0..10 → 50..100%) ----------
 function encodeCode() {
-  const parts = [];
+  const blocks = [];
   for (let n = 0; n < 24; n++) {
-    const st = state[n];
-    if (st && st.id) {
-      const op = st.opacity !== undefined ? st.opacity : 1;
-      parts.push(st.id + '/' + (st.colour === undefined || st.colour === null || st.colour === 0 ? 1 : st.colour) + '|' + Math.round(op * 9));
-    } else parts.push('0/0|9');
+    const L = state[n] || [];
+    const lines = [];
+    for (const ly of L) {
+      let line;
+      if (ly.id === undefined || ly.id === null) line = String(ly.colour);
+      else line = String(ly.id) + '/' + String(ly.colour);
+      const p = opToCode(ly.opacity);
+      if (p < 10) line += '|' + p; // 100% — без суффикса, как у CatWar
+      lines.push(line);
+    }
+    blocks.push(lines.length ? lines.join('-') : '0');
   }
-  return parts.join(' ');
+  return blocks.join(' ');
 }
 function applyCode(raw) {
   const blocks = raw.trim().split(/\s+/).filter(Boolean);
-  const next = {};
-  let bad = 0;
-  for (let n = 0; n < Math.min(blocks.length, 24); n++) {
-    const m = blocks[n].match(/^(\d+)\/(\d+)\|(\d+)$/);
-    if (m && +m[1] > 0) {
-      next[n] = { id: m[1], colour: m[2], opacity: Math.max(0.05, Math.min(1, +m[3] / 9)) };
-      const slot = slotOf(n);
-      // для глах спрайтов id = цвет
-    } else if (blocks[n] === '0/0|9' || blocks[n] === '0') {
-      // пусто
-    } else bad++;
+  const next = {}; let bad = 0; let seen = 0;
+  for (let n = 0; n < 24; n++) {
+    if (n >= blocks.length) continue;
+    seen++;
+    const b = blocks[n];
+    if (b === '0' || b === '0/0') continue; // пустой слот
+    const arr = [];
+    for (const blk of b.split('-')) {
+      if (!blk || blk === '0') continue;
+      let spec = blk, opPart = null;
+      const pipe = blk.indexOf('|');
+      if (pipe >= 0) { spec = blk.slice(0, pipe); opPart = blk.slice(pipe + 1); }
+      if (opPart !== null && !/^\d{1,2}$/.test(opPart)) { bad++; continue; }
+      const layer = {};
+      if (opPart !== null) layer.opacity = opFromCode(opPart);
+      const parts2 = spec.split('/');
+      if (parts2.length > 1) {
+        if (!/^\d+$/.test(parts2[0]) || !/^\d+$/.test(parts2[1])) { bad++; continue; }
+        layer.id = parts2[0]; layer.colour = parts2[1];
+        if (+parts2[0] === 0 && +parts2[1] === 0) continue; // 0/0 = пустO
+      } else {
+        if (!/^\d+$/.test(spec)) { bad++; continue; }
+        layer.colour = spec; // id-less слой: только цвет (CatWar: заливка/цвет глаза номером)
+        if (+spec === 0) continue;
+      }
+      arr.push(layer);
+    }
+    if (arr.length) next[n] = arr;
   }
-  state = next;
+  if (blocks.length > 24) bad += blocks.length - 24;
+  state = next; layerSel = {};
   persist(); render(); buildCategories(); buildSlotPanel();
-  if (bad) alert('Не удалось разобрать блоков: ' + bad);
+  if (bad) alert('Не удалось разобрать блоков: ' + bad + (blocks.length > 24 ? ' (в коде ' + blocks.length + ' блоков, слотов 24)' : ''));
+  else if (seen) { document.getElementById('code-out').value = encodeCode(); }
 }
 
 // ---------- прочее ----------
@@ -375,18 +492,18 @@ function randomize() {
     const ok = slot.elements.filter(e => e.ok !== false);
     if (!ok.length) continue;
     const el = ok[Math.floor(Math.random() * ok.length)];
-    if (slot.kind === 'sprite') next[slot.num] = { id: el.id, colour: 0, opacity: 1 };
+    if (slot.kind === 'sprite') next[slot.num] = [{ id: el.id, colour: 0, opacity: 1 }];
     else {
       let colour;
       if (slot.kind === 'base' || slot.kind === 'form') colour = baseCol;
       else if (slot.num === 0) colour = baseCol;
       else colour = String(1 + Math.floor(Math.random() * 24));
-      next[slot.num] = { id: el.id, colour, opacity: 1 };
+      next[slot.num] = [{ id: el.id, colour, opacity: 1 }];
     }
   }
   // хвост/грива/уши/шерсть — в тон основы (как у CatWar по умолчанию)
-  for (const n of [15, 16, 17, 18]) if (next[n]) next[n].colour = baseCol;
-  state = next; persist(); render(); buildCategories(); buildSlotPanel();
+  for (const n of [15, 16, 17, 18]) if (next[n]) next[n][0].colour = baseCol;
+  state = next; layerSel = {}; persist(); render(); buildCategories(); buildSlotPanel();
 }
 function resetAll() { state = DEFAULT_STATE(); persist(); render(); buildCategories(); buildSlotPanel(); }
 function updateCodeBox() { document.getElementById('code-out').value = encodeCode(); }
@@ -398,7 +515,21 @@ document.getElementById('btn-reset').onclick = resetAll;
 document.getElementById('btn-apply').onclick = () => applyCode(document.getElementById('code-in').value);
 
 // ---------- init ----------
-try { const raw = localStorage.getItem(LS_STATE); if (raw) state = JSON.parse(raw); } catch (e) {}
+// миграция: старый формат state[n]={...} → новый state[n]=[{...}] (слои);
+try {
+  const raw = localStorage.getItem(LS_STATE);
+  if (raw) {
+    const s = JSON.parse(raw);
+    state = {};
+    let empty = true;
+    for (const k in s) {
+      const v = s[k];
+      state[k] = Array.isArray(v) ? v : (v && Object.keys(v).length ? [v] : []);
+      if (state[k].length) empty = false;
+    }
+    if (empty) state = {};
+  }
+} catch (e) {}
 if (!Object.keys(state).length) state = DEFAULT_STATE();
 try { const p = localStorage.getItem(LS_POSE); if (p === 'sit' || p === 'walk') pose = p; } catch (e) {}
 buildCategories();
