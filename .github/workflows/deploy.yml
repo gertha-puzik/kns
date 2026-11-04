@@ -40,7 +40,7 @@ jobs:
             exit 1
           fi
           # --delete только внутри www. .git и .github на сервер не попадают.
-          rsync -az --delete --exclude='.git' --exclude='.github' \
+          rsync -az --delete --exclude='.git' --exclude='.github' --exclude='KNS-CONTEXT.md' \
             -e "$SSH" ./ \
             "$SSH_USER@$SSH_HOST:/opt/kns/www/"
           $SSH "$SSH_USER@$SSH_HOST" "chmod -R a+rX /opt/kns/www"
