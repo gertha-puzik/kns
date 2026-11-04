@@ -161,21 +161,40 @@ function getImage(src) {
 }
 
 // ---------- рендер ----------
-function drawLayer(img, st, tintHex, strip) {
+// cut_from-семантика CatWar (kns.js L546-554): элемент-слой — это ВЫРЕЗКА цветной
+// основы по альфе маски элемента: в буфер копируется цветной КОТ-основа
+// (base_color_{c}.png или база ФОРМЫ-родителя: basetail_f{f}_c{c}.png и т.п.),
+// затем destination-in маской (ср. их copy base → source-in mark).
+// multiply-тонировка остаётся только как fallback (база 404) и для не-cut
+// деталей (ушная раковина id4 — своя палитра в kns_def, не вырезка).
+function drawLayer(img, st, mode, strip, fr) {
+  // mode: {} plain | {tintHex:'#…'} multiply | {cutBase:Image} вырезка
   bctx.clearRect(0, 0, W, H);
   bctx.globalCompositeOperation = 'source-over';
   bctx.globalAlpha = st.opacity !== undefined ? st.opacity : 1;
-  const isStrip = strip && img.width >= M.walk.frameW * 2;
-  if (isStrip) bctx.drawImage(img, frame * M.walk.frameW, 0, M.walk.frameW, H, 0, 0, W, H);
-  else bctx.drawImage(img, 0, 0, W, H);
-  if (tintHex) { // multiply-тонировка: сохраняет авторские тени элементов
-    bctx.globalCompositeOperation = 'multiply';
-    bctx.fillStyle = tintHex;
-    bctx.fillRect(0, 0, W, H);
+  const fw = M.walk.frameW;
+  const fi = fr !== undefined && fr !== null ? fr : frame;
+  const isStrip = strip && img.width >= fw * 2;
+  const sx = (isStrip ? fi : 0) * fw;
+  if (mode.cutBase) {
+    const base = mode.cutBase;
+    const baseStrip = strip && base.width >= fw * 2;
+    if (baseStrip) bctx.drawImage(base, sx, 0, fw, H, 0, 0, W, H);
+    else bctx.drawImage(base, 0, 0, W, H);
     bctx.globalCompositeOperation = 'destination-in';
-    const src = isStrip ? 0 : 0;
-    if (isStrip) bctx.drawImage(img, frame * M.walk.frameW, 0, M.walk.frameW, H, 0, 0, W, H);
+    if (isStrip) bctx.drawImage(img, sx, 0, fw, H, 0, 0, W, H);
     else bctx.drawImage(img, 0, 0, W, H);
+  } else {
+    if (isStrip) bctx.drawImage(img, sx, 0, fw, H, 0, 0, W, H);
+    else bctx.drawImage(img, 0, 0, W, H);
+    if (mode.tintHex) { // fallback / не-cut деталь: multiply по маске
+      bctx.globalCompositeOperation = 'multiply';
+      bctx.fillStyle = mode.tintHex;
+      bctx.fillRect(0, 0, W, H);
+      bctx.globalCompositeOperation = 'destination-in';
+      if (isStrip) bctx.drawImage(img, sx, 0, fw, H, 0, 0, W, H);
+      else bctx.drawImage(img, 0, 0, W, H);
+    }
   }
   ctx.drawImage(buf, 0, 0);
   bctx.globalAlpha = 1;
@@ -191,9 +210,12 @@ function render() {
     if (!slot) continue;
     const act = pose === 'walk' ? 1 : 0;
     const strip = pose === 'walk'; // act1: полосы 400×150 → кадры
-    // слои слота рисуются по порядку — порядок = порядок в коде окраса (CatWar)
+    // CatWar (kns.js L477-481 + L546-557): promises слоёв собираются по УБЫВАНИЮ
+    // индекса, потом рисуются по порядку — первый слой блока кода ложится СВЕРХУ.
     const form = FORMPARENT[num] ? formOf(num) : undefined;
-    for (const st of layers) {
+    const fr = frameOf(num);
+    for (let li = layers.length - 1; li >= 0; li--) {
+      const st = layers[li];
       let src;
       if (st.id !== undefined && st.id !== null) {
         src = fileFor(slot, st, act, form);
@@ -209,8 +231,24 @@ function render() {
       }
       const im = getImage(src);
       if (!im || !im.complete || im.naturalWidth === 0) { missing++; continue; }
-      const tint = slot.kind === 'element' && st.colour !== 0 ? (hexOf(0, st.colour) || null) : null;
-      drawLayer(im, st, tint, strip);
+      // режим отрисовки: cut-вырезка (палитра 0, есть цвет), multiply для не-cut
+      // (палитры 4/5: усы/нос — гейты; ушная раковина id4 не вырезка по kns_def), иначе plain
+      let mode = {};
+      if (slot.kind === 'element' && st.colour !== 0 && st.colour !== undefined && st.colour !== null) {
+        const nonCut = (slot.palette || 0) !== 0 || ((num === 7 || num === 8) && String(st.id) === '4');
+        if (nonCut) {
+          const t = hexOf(0, st.colour); mode = t ? { tintHex: t } : {};
+        } else {
+          const baseSlot = slotOf(FORMPARENT[num] || 0);
+          const baseSrc = baseSlot.kind === 'form'
+            ? fileFor(baseSlot, { id: formOf(num), colour: st.colour }, act)
+            : fileFor(baseSlot, { colour: st.colour }, act);
+          const bi = getImage(baseSrc);
+          if (bi && bi.complete && bi.naturalWidth > 0) mode = { cutBase: bi };
+          else { const t = hexOf(0, st.colour); mode = t ? { tintHex: t } : {}; } // база 404 → мультцветом
+        }
+      }
+      drawLayer(im, st, mode, strip, fr);
     }
   }
   const note = document.getElementById('skip-note');
@@ -222,7 +260,14 @@ function render() {
 }
 
 // ---------- walk-анимация ----------
-function startAnim() { stopAnim(); frame = 0; frameAcc = 0; lastTs = 0; animTimer = setInterval(tick, 40); }
+// у CatWar у слоёв СВОИ канвасы-тайминги (kns.js L503-515): хвост-основа (15) и
+// хвост-элементы (6) качаются отдельно от шагов: times['1'] = [5000,100,100,100]
+// против телa [1000,200,200,300] — считаем второй аккумулятор кадров.
+let tailFrame = 0, tailAcc = 0;
+function frameOf(num) {
+  return ((M.walk.tailSlots || []).indexOf(num) !== -1) ? tailFrame : frame;
+}
+function startAnim() { stopAnim(); frame = 0; frameAcc = 0; tailFrame = 0; tailAcc = 0; lastTs = 0; animTimer = setInterval(tick, 40); }
 function stopAnim() { if (animTimer) { clearInterval(animTimer); animTimer = null; } }
 function tick() {
   const now = Date.now();
@@ -232,6 +277,10 @@ function tick() {
   const ms = M.walk.frameMs;
   let guard = 0;
   while (frameAcc >= ms[frame] && guard++ < 10) { frameAcc -= ms[frame]; frame = (frame + 1) % ms.length; }
+  const tms = M.walk.tailFrameMs || [5000, 100, 100, 100];
+  tailAcc += dt;
+  let guard2 = 0;
+  while (tailAcc >= tms[tailFrame] && guard2++ < 10) { tailAcc -= tms[tailFrame]; tailFrame = (tailFrame + 1) % tms.length; }
   render();
 }
 function setPose(newPose) {
@@ -305,7 +354,8 @@ function buildSlotPanel() {
   const kindNames = { base: 'основа · основной цвет', form: 'основа · форма', sprite: 'спрайт · цвет', element: 'элемент' };
   document.getElementById('slot-title').textContent = 'Слот ' + slot.num + ' · ' + slot.name + ' (' + kindNames[slot.kind] + ')';
 
-  // ---- СЛОИ слота (грамматика CatWar: слоёв может быть несколько, порядок = порядок наложения) ----
+  // ---- СЛОИ слота (грамматика CatWar: слоёв несколько; ПЕРВЫЙ слой блока кода — верхний,
+  // рендер идёт в обратном порядке перечисления — kns.js L477-481+L546-557) ----
   const layersDiv = document.createElement('div');
   layersDiv.className = 'hdr';
   layersDiv.textContent = 'Слои слота: ' + (L.length || 0) + (L.length > 1 ? ' (каждый со своим цветом и прозрачностью)' : '');
@@ -331,7 +381,7 @@ function buildSlotPanel() {
     b.onclick = fn;
     return b;
   };
-  ops.appendChild(mkBtn('+ слой', 'Добавить слой в этот слот (как у CatWar: до 8 слоёв, накладываются по порядку)', () => {
+  ops.appendChild(mkBtn('+ слой', 'Добавить слой в этот слот (как у CatWar: до 8 слоёв; первый слой — верхний, рендер обратный перечислению)', () => {
     if (!state[slot.num]) state[slot.num] = [];
     state[slot.num].push({ id: firstOkId(slot), colour: 18, opacity: 1 });
     layerSel[slot.num] = state[slot.num].length - 1;
