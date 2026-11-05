@@ -18,13 +18,13 @@
   h1 { margin: 0 0 4px; font-size: 22px; font-weight: 650; }
   .hint { margin: 0 0 16px; color: #9aa1ad; font-size: 13px; max-width: 800px; text-align: center; }
 
-  /* «окно игры» 800×500 */
+  /* «окно игры» 800×250 */
   #game {
-    position: relative; width: 800px; height: 500px; flex: none;
+    position: relative; width: 800px; height: 250px; flex: none;
     border-radius: 10px; overflow: hidden;
     box-shadow: 0 8px 30px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08);
   }
-  #game canvas { position: absolute; left: 0; top: 0; width: 800px; height: 500px; display: block; }
+  #game canvas { position: absolute; left: 0; top: 0; width: 800px; height: 250px; display: block; }
   #hud { cursor: default; }
 
   /* панель управления — светлая, под окном (не в правом верхнем углу) */
@@ -45,13 +45,15 @@
   #p4val { font-variant-numeric: tabular-nums; min-width: 190px; color: #4a515c; font-size: 13px; }
   .sep { width: 1px; height: 22px; background: #c5cad3; margin: 0 4px; }
 
-  /* слоты загрузки своих картинок */
-  .slot { display: inline-flex; align-items: center; gap: 4px; }
+  /* слоты загрузки своих картинок: кнопка + ✕ сверху, рекомендованный размер снизу */
+  .slot { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+  .slotrow { display: inline-flex; align-items: center; gap: 4px; }
   .slot label { font-size: 12.5px; padding: 5px 10px; background: #fff; border: 1px dashed #9aa5b5;
                 border-radius: 7px; cursor: pointer; max-width: 240px; overflow: hidden;
                 white-space: nowrap; text-overflow: ellipsis; }
   .slot label:hover { background: #eaf1fb; }
   .slot label.set { border-style: solid; border-color: #2f6fd6; color: #1c4f9e; }
+  .slot .dim { font-size: 11px; color: #8a93a3; line-height: 1.25; }
   .custom-hint { grid-column: 2; color: #7c8492; font-size: 12px; }
 </style>
 </head>
@@ -97,11 +99,23 @@
 
     <div class="lbl">Свои картинки</div>
     <div class="row" id="customs">
-      <span class="slot"><input id="f-disc" type="file" accept="image/*" hidden data-k="disc"><label id="lbl-disc" for="f-disc" title="Большой круг время суток">Круг</label><button class="clr" data-k="disc" title="Вернуть рисованный">✕</button></span>
-      <span class="slot"><input id="f-needle" type="file" accept="image/*" hidden data-k="needle"><label id="lbl-needle" for="f-needle" title="Звезда-игла слева от круга">Стрелочка</label><button class="clr" data-k="needle" title="Вернуть рисованный">✕</button></span>
-      <span class="slot"><input id="f-sun" type="file" accept="image/*" hidden data-k="sun"><label id="lbl-sun" for="f-sun" title="Иконка «Солнечно»">Солнечно</label><button class="clr" data-k="sun" title="Вернуть рисованный">✕</button></span>
-      <span class="slot"><input id="f-cloud" type="file" accept="image/*" hidden data-k="cloud"><label id="lbl-cloud" for="f-cloud" title="Иконка «Пасмурно»">Пасмурно</label><button class="clr" data-k="cloud" title="Вернуть рисованный">✕</button></span>
-      <span class="slot"><input id="f-rain" type="file" accept="image/*" hidden data-k="rain"><label id="lbl-rain" for="f-rain" title="Иконка «Дождь»">Дождь</label><button class="clr" data-k="rain" title="Вернуть рисованный">✕</button></span>
+      <span class="slot"><span class="slotrow"><input id="f-disc" type="file" accept="image/*" hidden data-k="disc"><label id="lbl-disc" for="f-disc" title="Большой круг время суток">Круг</label><button class="clr" data-k="disc" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 512×512 px, PNG (квадрат)</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-needle" type="file" accept="image/*" hidden data-k="needle"><label id="lbl-needle" for="f-needle" title="Звезда-игла слева от круга">Стрелочка</label><button class="clr" data-k="needle" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-sun" type="file" accept="image/*" hidden data-k="sun"><label id="lbl-sun" for="f-sun" title="Иконка «Солнечно»">Солнечно</label><button class="clr" data-k="sun" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-cloud" type="file" accept="image/*" hidden data-k="cloud"><label id="lbl-cloud" for="f-cloud" title="Иконка «Пасмурно»">Пасмурно</label><button class="clr" data-k="cloud" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-rain" type="file" accept="image/*" hidden data-k="rain"><label id="lbl-rain" for="f-rain" title="Иконка «Дождь»">Дождь</label><button class="clr" data-k="rain" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+    </div>
+
+    <div class="lbl">Для художника</div>
+    <div class="row">
+      <button id="dl-svg">🧭 Скачать шаблон круга (SVG)</button>
+      <button id="dl-png">То же в PNG 1024×1024</button>
+      <span id="tpl-note" class="custom-hint">круг поделен на 4 сектора: ↖ утро, ↗ день, ↘ вечер, ↙ ночь; подрисуй своё окружение в каждом секторе и загрузи как «Круг» (сектор под иглой слева = текущее время, диск крутится против часовой)</span>
     </div>
 
     <div class="lbl">Показать вариант</div>
@@ -121,7 +135,7 @@
 
 /* ===================== Константы ===================== */
 
-const W = 800, H = 500;                        // размер «окна игры»
+const W = 800, H = 250;                        // размер «окна игры»
 const DAYPART_MS = 7 * 60 * 1000;              // одна часть суток = 7 минут
 const DAYPART_LABEL = ['Утро', 'День', 'Вечер', 'Ночь'];
 const WEATHER_LABEL = { sun: 'Солнечно', cloud: 'Пасмурно', rain: 'Дождь' };
@@ -680,6 +694,87 @@ $('customs').addEventListener('click', (e) => {
   const btn = e.target.closest('button.clr');
   if (!btn) return;
   clearCustom(btn.dataset.k);
+});
+
+/* ===================== Шаблон круга для художника =====================
+ * Разметка совпадает с механикой демки: диск вращается против часовой 90° за
+ * часть суток, «сейчас» всегда у звезды-иглы СЛЕВА. Сектор, который в момент
+ * p4=0 (начало утро) примыкает к игле, — «Утро» и далее по ходу: день, вечер, ночь.
+ * Углы в экранных координатах (0° = право, 90° = низ): Утро 180–270 (лево→верх),
+ * День 270–360 (верх→право), Вечер 0–90 (право→низ), Ночь 90–180 (низ→лево). */
+function templateSVG() {
+  const C = 512, R = 506;
+  const P = (ang, r) => [C + r * Math.cos(ang * Math.PI / 180), C + r * Math.sin(ang * Math.PI / 180)];
+  const sectors = [
+    { name: 'Утро', from: 180, to: 270, fill: '#f8b195' },
+    { name: 'День', from: 270, to: 360, fill: '#a9ccf8' },
+    { name: 'Вечер', from: 0, to: 90, fill: '#e07a5f' },
+    { name: 'Ночь', from: 90, to: 180, fill: '#1c2f57' },
+  ];
+  let body = '';
+  for (const s of sectors) {
+    const [x1, y1] = P(s.from, R), [x2, y2] = P(s.to, R);
+    body += '  <path d="M ' + C + ' ' + C + ' L ' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
+      ' A ' + R + ' ' + R + ' 0 0 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1) + ' Z" fill="' + s.fill +
+      '" stroke="rgba(20,25,45,0.35)" stroke-width="2"/>\n';
+    const mid = (s.from + s.to) / 2;
+    const [tx, ty] = P(mid, R * 0.60);
+    const dark = s.name === 'Ночь';
+    body += '  <text x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) +
+      '" text-anchor="middle" dominant-baseline="middle" font-size="72"' +
+      ' font-family="system-ui, -apple-system, \'Segoe UI\', sans-serif" font-weight="650" fill="' +
+      (dark ? '#fff' : '#22262d') + '" opacity="0.85">' + s.name + '</text>\n';
+  }
+  // дуга направления вращения (против часовой) в секторе «День»
+  const rA = R - 44;
+  const [ax, ay] = P(340, rA), [bx, by] = P(282, rA);
+  body += '  <path d="M ' + ax.toFixed(1) + ' ' + ay.toFixed(1) + ' A ' + rA + ' ' + rA +
+    ' 0 0 0 ' + bx.toFixed(1) + ' ' + by.toFixed(1) + '" fill="none" stroke="#22262d"' +
+    ' stroke-width="5" stroke-linecap="round" opacity="0.8"/>\n';
+  const t2 = 282 * Math.PI / 180;
+  const ux = Math.sin(t2), uy = -Math.cos(t2);            // тангенс против часовой
+  const qx = Math.cos(t2), qy = Math.sin(t2);             // наружная нормаль
+  const tipX = bx + ux * 26, tipY = by + uy * 26;
+  body += '  <polygon points="' + tipX.toFixed(1) + ',' + tipY.toFixed(1) + ' ' +
+    (bx + qx * 12).toFixed(1) + ',' + (by + qy * 12).toFixed(1) + ' ' +
+    (bx - qx * 12).toFixed(1) + ',' + (by - qy * 12).toFixed(1) +
+    '" fill="#22262d" opacity="0.8"/>\n';
+  // метка под иглой: слева, чуть ниже оси (в секторе ночи — не мешает утренней четверти)
+  const [nx, ny] = P(180, R * 0.80);
+  body += '  <text x="' + (nx + 6) + '" y="' + (ny + 24) +
+    '" font-size="30" font-family="system-ui, -apple-system, \'Segoe UI\', sans-serif"' +
+    ' font-weight="650" fill="#22262d" opacity="0.6">← игла «сейчас»</text>\n';
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<!-- Шаблон круга HUD «время суток»: 4 сектора-четверти. Подрисуй в каждом секторе\n' +
+    '     подходящее окружение (небо/свет/звёзды), экспортируй PNG 1024x1024 и загрузи\n' +
+    '     как «Круг» в демке. Диск крутится против часовой, слева у иглы — текущее время. -->\n' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">\n' +
+    ' <title>Круг время суток — шаблон секторов</title>\n' + body + '</svg>\n';
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.download = name;
+  a.href = url;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+$('dl-svg').addEventListener('click', () => {
+  downloadBlob(new Blob([templateSVG()], { type: 'image/svg+xml' }), 'hud-circle-template.svg');
+});
+
+$('dl-png').addEventListener('click', () => {
+  const svg = templateSVG();
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas');
+    cv.width = 1024; cv.height = 1024;
+    cv.getContext('2d').drawImage(img, 0, 0, 1024, 1024);
+    cv.toBlob((b) => downloadBlob(b, 'hud-circle-template-1024.png'), 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 });
 
 /* Кадр HUD → PNG: девочки скачивают и кидают картинкой, чтобы предложить вариант. */
