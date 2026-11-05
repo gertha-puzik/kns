@@ -86,7 +86,7 @@
 
 Прод-инварианты рендера: `assetRoot=""` в репо-манифесте vs `"../catwar-kns-full/"` в локальном artpack (перепутать = пустой canvas при 200-х); hexOf принимает palettes и массивом, и `{colours:[...]}`; walk-полосы 400×150 по 4 кадра, timing [1000,200,200,300]; модельки 100×150, опора по нижнему краю; белую подсветку-силуэт и тень движка в арт не запекать; localStorage-ключи `coop_kns_catwar_state|pose`.
 
-Инфраструктура: VPS `89.232.184.77` (nginx, статика `/opt/kns/www`, юзер deploy, серт Let's Encrypt); CI «KNS на kns.miew.ru» ≈40 c (rsync --delete, .git/.github исключены); `gh` авторизован как polexka; org github.com/gertha-puzik. Игра-эталон стилистики: топ-даун, поле `#616517`, трава+кусты.
+Инфраструктура: VPS `89.232.184.77` (nginx, статика `/opt/kns/www`, юзер deploy, серт Let's Encrypt); CI «KNS на kns.miew.ru» ≈40 c (rsync --delete, .git/.github исключены); `gh` авторизован как polexka; org github.com/gertha-puzik. Игра-эталон стилистики: топ-даун, поле `#616517`, трава+кусты. Каталог `weather-demo/` — живущая на kns.miew.ru/weather-demo интерактивная демка HUD «время суток + погода» для coop-field (по запросу заказчицы; самостоятельная страница, не часть редактора окрасов; свои картинки посетителей живут только у них в браузере, localStorage).
 
 ## 7. Приёмка-цифры (последние замеры на проде)
 
