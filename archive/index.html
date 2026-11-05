@@ -248,7 +248,7 @@ footer{color:#888;font-size:11px;margin-top:24px;}
 <li>Walk-анимация панели живая: полный цикл фаз 0→1→2→3→0 подтверждён счётчиком кадров и сменой пиксельных хэшей; хвост-вниз виден только в walk, как заказано.</li>
 <li>Регрессии по слотовому коту нет: дефолтный рендер слотового кота идентичен текущему прод-рендеру (<b>5756 непустых px</b> и там и там), сам рендер CatWar-слоёв не менялся.</li>
 </ul>
-<p><b>Как устроено:</b> новая директория <code>model/</code> с 15 PNG (100×150, кадры решений 2026-11-05); в <code>index.html</code> — панель <code>#model-panel</code>, состояние <code>{build, tail}</code> в localStorage <code>coop_kns_model_opts</code>, карта <code>MODEL_FRAMES_WALK[build][tail]</code> из 4 фаз, рендер в общем тике анимации (аккумулятор 280 мс), сброс в <code>applyCode</code>/«Сбросить». Вёрстка: подпись над рядом кнопок, активная подсвечивается. QC-гейт <code>tools/pr_qc.py</code> (node --check inline-JS, CJK-мусор, инварианты манифеста) — зелёный.</p>
+<p><b>Как устроено:</b> новая директория <code>model/</code> с 27 PNG (100×150: 3 сита + 6 walk-серий × 4 фазы, кадры решений 2026-11-05); в <code>index.html</code> — панель <code>#model-panel</code>, состояние <code>{build, tail}</code> в localStorage <code>coop_kns_model_opts</code>, карта <code>MODEL_FRAMES_WALK[build][tail]</code> из 4 фаз, рендер в общем тике анимации (аккумулятор 280 мс), сброс в <code>applyCode</code>/«Сбросить». Вёрстка: подпись над рядом кнопок, активная подсвечивается. QC-гейт <code>tools/pr_qc.py</code> (node --check inline-JS, CJK-мусор, инварианты манифеста) — зелёный.</p>
 </div></details>
 <script>
 (() => {
