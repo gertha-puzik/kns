@@ -295,7 +295,8 @@ function loadFile(name, file, done) {
       LOADED[name] = rec;                                     // повторная загрузка = перезапись
       if (old && old.url) URL.revokeObjectURL(old.url);
       renderProgress(); renderAnim();
-      toast('готово: ' + name + ' · распознано ' + rec.stats.R + '%');
+      toast('готово: ' + name + ' · распознано ' + rec.stats.R + '%' +
+            (rec.stats.opaque < rec.w * rec.h * 0.08 ? ' · ⚠ силуэт почти пуст (' + rec.stats.opaque + ' px)' : ''));
     }
     if (done) done();
   };
@@ -368,6 +369,10 @@ function rowFor(f) {
     var R = rec.stats.R;
     var cls = R >= 70 ? 'r-good' : (R >= 40 ? 'r-mid' : 'r-bad');
     var extra = R >= 70 ? '' : (R >= 40 ? ' — много неразпознанного' : ' — почти всё вне легенды');
+    if (rec.stats.opaque < rec.w * rec.h * 0.08) {            // осколочный силуэт — предупредить, зелёное не давать
+      extra += ' · ⚠ силуэт почти пуст (' + rec.stats.opaque + ' px)';
+      if (cls === 'r-good') cls = 'r-mid';
+    }
     st.classList.add(cls);
     st.textContent = '✅ загружен · распознано ' + R + '%' + extra;
   } else st.textContent = '⏳ не загружен';
