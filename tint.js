@@ -24,8 +24,9 @@
 (function (global) {
   const W = 100, H = 150;
   // порядок отрисовки снизу вверх; маски дизъюнктны, порядок влияет только
-  // на мягкие края (alpha>0) — стыковка не пересекается.
-  const FUR_LAYERS = ['body', 'chest', 'belly', 'tail', 'hind', 'fore', 'head', 'earL', 'earR'];
+  // на мягкие края (alpha>0) — стыковка не пересекается. Лапы с этапа
+  // «зоны 13»: fore->foreL+foreR, hind->hindL+hindR (по сторонам «на виде»).
+  const FUR_LAYERS = ['body', 'chest', 'belly', 'tail', 'hindL', 'hindR', 'foreL', 'foreR', 'head', 'earL', 'earR'];
   // палитры_hex(_id) возвращает hex цвета id из палитры живого дампа (манифест).
   function palOf(idx) {
     const raw = CATWAR_MANIFEST.palettes[idx] || CATWAR_MANIFEST.palettes[0];
@@ -120,7 +121,7 @@
   }
 
   // цвета зон из parsed-state: слот зоны — meta.slotColour (tail=15, уши=17, тело=0)
-  function zoneSlots() { return meta ? meta.slotColour : { tail: 15, earL: 17, earR: 17, body: 0, head: 0, fore: 0, hind: 0, chest: 0, belly: 0 }; }
+  function zoneSlots() { return meta ? meta.slotColour : { tail: 15, earL: 17, earR: 17, body: 0, head: 0, foreL: 0, foreR: 0, hindL: 0, hindR: 0, chest: 0, belly: 0 }; }
 
   function layerStack(state, slot) {
     return state && state[slot] ? state[slot] : null;
