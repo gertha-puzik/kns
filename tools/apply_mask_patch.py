@@ -32,7 +32,7 @@ except ImportError:
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-ZONES = ["eyes", "earL", "earR", "nose", "tail", "fore", "hind", "head", "chest", "belly", "body"]
+ZONES = ["eyes", "earL", "earR", "nose", "tail", "foreL", "foreR", "hindL", "hindR", "head", "chest", "belly", "body"]
 TARGETS = {
     "norm": "artpack/m2_layer_masks.json",
     "thin": "artpack/thin_layer_masks.json",

@@ -100,13 +100,15 @@ window.addEventListener('error', function (e) { ERR.push(String(e.message || e))
 
 const PALETTE = {
   tail:['#d32f2f',211,47,47], body:['#7b1fa2',123,31,162], head:['#fbc02d',251,192,45],
-  fore:['#388e3c',56,142,60], hind:['#0288d1',2,136,209], earL:['#f48fb1',244,143,177],
+  foreL:['#2e7d32',46,125,50], foreR:['#66bb6a',102,187,106],
+  hindL:['#01579b',1,87,155], hindR:['#4fc3f7',79,195,247],
+  earL:['#f48fb1',244,143,177],
   earR:['#ff7043',255,112,67], nose:['#ffeb3b',255,235,59], chest:['#e1bee3',225,190,227],
   belly:['#b2dfdb',178,223,219], eyes:['#000000',0,0,0]
 };
 const ZONES = D.zones;                       // [{id,label}] — порядок = приоритет (индекс 0 = высший)
 const ZIDX = {}; ZONES.forEach(function (z, i) { ZIDX[z.id] = i; });
-const DISPLAY = ['tail','body','head','fore','hind','earL','earR','nose','chest','belly','eyes']; // порядок строк как в легендах витрин
+const DISPLAY = ['tail','body','head','foreL','foreR','hindL','hindR','earL','earR','nose','chest','belly','eyes']; // порядок строк как в легендах витрин
 const BODY_ID = ZIDX.body;
 const LS_KEY = 'kns_mask_annotator_edits_v1';
 

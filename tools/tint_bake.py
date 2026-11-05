@@ -40,8 +40,8 @@ GENS = os.environ.get('KNS_GENERATIONS', sys.argv[sys.argv.index('--gens') + 1] 
 MEASURE = '--measure' in sys.argv
 OUT_DIR = os.path.join(ROOT, 'gray')
 
-FUR_LAYERS = ['tail', 'body', 'head', 'fore', 'hind', 'chest', 'belly', 'earL', 'earR']
-FUR_COAT_LAYERS = ['tail', 'body', 'head', 'fore', 'hind']  # «мех» для калибровки K
+FUR_LAYERS = ['tail', 'body', 'head', 'foreL', 'foreR', 'hindL', 'hindR', 'chest', 'belly', 'earL', 'earR']
+FUR_COAT_LAYERS = ['tail', 'body', 'head', 'foreL', 'foreR', 'hindL', 'hindR']  # «мех» для калибровки K
 PROTECT_STATIC = ['eyes', 'nose']
 MEDIAN_LUM_TARGET = 235
 
@@ -249,7 +249,7 @@ def main():
         'ops': 'fill(paletteHex) -> multiply(gray) -> destination-in(gray) — cut_from-паритет kns.js L546-557',
         'medianLumTarget': MEDIAN_LUM_TARGET,
         'slotColour': {'tail': 15, 'earL': 17, 'earR': 17, 'body': 0, 'head': 0,
-                       'fore': 0, 'hind': 0, 'chest': 0, 'belly': 0},
+                       'foreL': 0, 'foreR': 0, 'hindL': 0, 'hindR': 0, 'chest': 0, 'belly': 0},
         'builds': {},
     }
     for build in ('norm', 'thin', 'chub'):
