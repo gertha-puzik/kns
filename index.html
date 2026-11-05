@@ -7,12 +7,16 @@
 <style>
   /* ретро-стиль в духе оригинального CatWar kns.php */
   * { box-sizing: border-box; }
-  body { background: #efefef; font: 13px/1.35 Tahoma, Verdana, sans-serif; color: #222; margin: 0; padding: 8px; }
+  body { background-color: #616517; /* фон: тайл реального игрового поля; фолбэк — цвет поля */
+         background-image: linear-gradient(180deg, rgba(20,26,8,.28), rgba(20,26,8,.42)), url('img/field_page.webp');
+         background-size: cover, 1100px auto; /* слой 1 — градиент на весь экран, слой 2 — тайл поля периодом ×1.25 */
+         font: 13px/1.35 Tahoma, Verdana, sans-serif; color: #222; margin: 0; padding: 8px; }
   a { color: #1d4e89; }
   .wrap { display: flex; gap: 10px; align-items: flex-start; }
   .panel { background: #f7f7f7; border: 1px solid #aaa; padding: 8px; }
-  h1 { font-size: 18px; margin: 0 0 2px; color: #7a4a12; }
+  h1 { font-size: 18px; margin: 0 0 2px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
   .note { color: #666; font-size: 11px; margin: 0 0 8px; }
+  body > .note { color: #f6f8e6; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
   .catname { font-weight: bold; color: #333; }
   .cat-group { margin-bottom: 8px; }
   .cat-title { background: #5d7a61; color: #fff; font-weight: bold; padding: 2px 6px; border: 1px solid #43604a; }
@@ -22,7 +26,7 @@
   .cat-item.locked { color: #997; cursor: help; }
   .badge { font-size: 10px; color: #b33; margin-left: 4px; }
   .preview { text-align: center; }
-  canvas { display: block; margin: 0 auto 6px; background: #fff; border: 1px solid #999; image-rendering: pixelated; }
+  canvas { display: block; margin: 0 auto 6px; background-color: #616517; background-image: url('img/field_canvas.webp'); border: 1px solid #999; image-rendering: pixelated; filter: drop-shadow(0 4px 5px rgba(0,0,0,.3)); }
   button { font: 12px Tahoma; margin: 2px 1px; padding: 3px 9px; background: #eee; border: 1px solid #999; border-color: #ccc #888 #888 #ccc; cursor: pointer; }
   button:hover { background: #e0e6f0; }
   button.active { background: #cfe0cf; border-color: #7a9a7a; font-weight: bold; }
@@ -41,6 +45,13 @@
   textarea { font: 11px monospace; width: 98%; height: 34px; }
   .hdr { font-weight: bold; color: #5d7a61; border-bottom: 1px dashed #bbb; padding-bottom: 2px; margin-bottom: 5px; }
   input[type=range] { width: 120px; vertical-align: middle; }
+  /* модель-пара: ходьба (анимация) + сид-калачик всегда рядом (2026-11-05).
+     Без JS-масштаба: клетки flex-ом сжимаются при нехватке места (мобильные),
+     ряд никогда не сворачивается, канвасы всегда равной ширины */
+  .model-pair { display: flex; gap: 10px; justify-content: center; align-items: flex-end; }
+  .model-cell { flex: 0 1 240px; min-width: 96px; text-align: center; }
+  .model-cell canvas { width: 100%; height: auto; margin: 0 auto 2px; }
+  .model-cap { font-size: 10px; color: #666; }
   details.catwar-code summary { cursor: pointer; }
   details.catwar-code[open] summary { margin-bottom: 4px; }
 </style>
@@ -70,14 +81,23 @@
     </details>
   </div>
 
-  <div class="panel" style="max-width:300px" id="model-panel">
+  <div class="panel" id="model-panel">
     <div class="catname">Модель — база M2</div>
-    <canvas id="model" width="100" height="150"></canvas>
+    <div class="model-pair" id="model-pair">
+      <div class="model-cell">
+        <canvas id="model" width="100" height="150"></canvas>
+        <div class="model-cap">Ходьба (анимация)</div>
+      </div>
+      <div class="model-cell">
+        <canvas id="model-sit" width="100" height="150"></canvas>
+        <div class="model-cap">Сид (калачик)</div>
+      </div>
+    </div>
     <div class="row" style="margin-bottom:1px">Телосложение:</div>
     <div class="row" id="model-build"></div>
     <div class="row" style="margin-bottom:1px">Хвост:</div>
     <div class="row" id="model-tail"></div>
-    <div class="note">Поза — общая с котом слева. «Хвост» действует на ходьбу (сид — калачик: ситы с хвостом-вниз не заказаны). Импорт кода из CatWar сбрасывает обе опции в дефолт: среднее + вверх (родная M2).</div>
+    <div class="note">Модель справа всегда показывает обе позы: идёт (280 мс/кадр) и сидит-калачик. «Хвост» действует только на ходьбу (ситы с хвостом-вниз не заказаны), телосложение — на обе. Поза «сидит/ходит» — настройка окраса-кота слева. Импорт кода из CatWar сбрасывает телосложение и хвост в дефолт: среднее + вверх (родная M2).</div>
   </div>
 
   <div class="panel" style="max-width:470px; flex:1">
@@ -284,8 +304,21 @@ let tailFrame = 0, tailAcc = 0;
 function frameOf(num) {
   return ((M.walk.tailSlots || []).indexOf(num) !== -1) ? tailFrame : frame;
 }
-function startAnim() { stopAnim(); frame = 0; frameAcc = 0; tailFrame = 0; tailAcc = 0; lastTs = 0; modelFrame = 0; modelAcc = 0; animTimer = setInterval(tick, 40); }
+function startAnim() { stopAnim(); frame = 0; frameAcc = 0; tailFrame = 0; tailAcc = 0; lastTs = 0; animTimer = setInterval(tick, 40); }
 function stopAnim() { if (animTimer) { clearInterval(animTimer); animTimer = null; } }
+// анимация модели M2 (280 мс/кадр) живёт ОТДЕЛЬНО от позы окраса-кота слева:
+// левая клетка пары — ходьба всегда, правая — статичный сид-калачик
+let modelTimer = null, modelLastTs = 0;
+function startModelAnim() { if (!modelTimer) { modelLastTs = 0; modelTimer = setInterval(tickModel, 40); } }
+function tickModel() {
+  const now = Date.now();
+  const dt = modelLastTs ? now - modelLastTs : 40;
+  modelLastTs = now;
+  modelAcc += dt;
+  let guard3 = 0;
+  while (modelAcc >= MODEL_WALK_MS && guard3++ < 10) { modelAcc -= MODEL_WALK_MS; modelFrame = (modelFrame + 1) % 4; }
+  renderModel();
+}
 function tick() {
   const now = Date.now();
   const dt = lastTs ? now - lastTs : 40;
@@ -298,11 +331,7 @@ function tick() {
   tailAcc += dt;
   let guard2 = 0;
   while (tailAcc >= tms[tailFrame] && guard2++ < 10) { tailAcc -= tms[tailFrame]; tailFrame = (tailFrame + 1) % tms.length; }
-  modelAcc += dt;
-  let guard3 = 0;
-  while (modelAcc >= MODEL_WALK_MS && guard3++ < 10) { modelAcc -= MODEL_WALK_MS; modelFrame = (modelFrame + 1) % 4; }
   render();
-  renderModel();
 }
 function setPose(newPose) {
   if (newPose !== 'sit' && newPose !== 'walk') return;
@@ -313,7 +342,6 @@ function setPose(newPose) {
   stopAnim();
   if (pose === 'walk') startAnim();
   render();
-  renderModel();
   updatePoseButtons();
 }
 function updatePoseButtons() {
@@ -348,14 +376,14 @@ const MODEL_TAILS = [['up', 'Вверх'], ['down', 'Вниз']];
 let modelOpts = { build: 'norm', tail: 'up' };
 let modelFrame = 0, modelAcc = 0;
 const mcv = document.getElementById('model');
-mcv.style.width = Math.round(W * 2.4) + 'px';
-mcv.style.height = Math.round(H * 2.4) + 'px';
+const mscv = document.getElementById('model-sit'); // сид-калачик рядом с ходьбой (просьба заказчицы, ТГ 2026-11-05)
 const mctx = mcv.getContext('2d');
+const msctx = mscv.getContext('2d');
 const modelImgs = {};
 function modelImg(src) {
   if (modelImgs[src] === undefined) {
     const im = new Image();
-    im.onload = renderModel;
+    im.onload = function () { renderModel(); renderModelSit(); };
     im.onerror = function () { modelImgs[src] = null; };
     im.src = src;
     modelImgs[src] = im;
@@ -363,13 +391,17 @@ function modelImg(src) {
   return modelImgs[src];
 }
 function modelFile() {
-  if (pose === 'walk') return MODEL_FRAMES_WALK[modelOpts.build][modelOpts.tail][modelFrame % 4];
-  return MODEL_FRAMES_SIT[modelOpts.build];
+  return MODEL_FRAMES_WALK[modelOpts.build][modelOpts.tail][modelFrame % 4]; // левая клетка пары — всегда ходьба
 }
 function renderModel() {
   mctx.clearRect(0, 0, W, H);
   const im = modelImg(modelFile());
   if (im && im.complete && im.naturalWidth > 0) mctx.drawImage(im, 0, 0);
+}
+function renderModelSit() { // правая клетка пары — всегда сид-калачик
+  msctx.clearRect(0, 0, W, H);
+  const im = modelImg(MODEL_FRAMES_SIT[modelOpts.build]);
+  if (im && im.complete && im.naturalWidth > 0) msctx.drawImage(im, 0, 0);
 }
 function buildModelButtons() {
   const hostB = document.getElementById('model-build');
@@ -397,14 +429,16 @@ function setModelOpts(build, tail) {
   try { localStorage.setItem(LS_MODEL_OPTS, JSON.stringify(modelOpts)); } catch (e) {}
   buildModelButtons();
   renderModel();
+  renderModelSit();
 }
 function resetModelOpts() { setModelOpts('norm', 'up'); }
 // зонд приёмки (как window.__frame у витрины): опции/кадр модели видны извне, детерминизм для пиксельных диффов
 window.__knsModel = {
   get opts() { return Object.assign({}, modelOpts); },
   get frame() { return modelFrame; },
+  get sitFile() { return MODEL_FRAMES_SIT[modelOpts.build]; },
   setFrame(k) { modelFrame = k; renderModel(); },
-  force(b, t) { if (b) modelOpts.build = b; if (t) modelOpts.tail = t; renderModel(); }
+  force(b, t) { if (b) modelOpts.build = b; if (t) modelOpts.tail = t; renderModel(); renderModelSit(); }
 };
 
 // ---------- категории (как в KNS: Основа / Шея и морда / Туловище / Лапы и хвост) ----------
@@ -716,7 +750,9 @@ updatePoseButtons();
 buildModelButtons();
 render();
 renderModel();
+renderModelSit();
 if (pose === 'walk') startAnim();
+startModelAnim(); // модель: ходьба анимируется всегда, независимо от позы окраса-кота
 </script>
 </body>
 </html>
