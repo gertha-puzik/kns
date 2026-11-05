@@ -48,6 +48,8 @@
   .model-cell { flex: 0 1 240px; min-width: 96px; text-align: center; }
   .model-cell canvas { width: 100%; height: auto; margin: 0 auto 2px; }
   .model-cap { font-size: 10px; color: #666; }
+  details.catwar-code summary { cursor: pointer; }
+  details.catwar-code[open] summary { margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -59,18 +61,20 @@
   <div class="panel" id="cats" style="min-width:170px"></div>
 
   <div class="panel preview">
-    <div class="catname">Котик (превью 2.4x)</div>
+    <div class="catname">Котик — референс CatWar (превью 1.6x)</div>
     <canvas id="main" width="100" height="150"></canvas>
     <div class="row">Поза: <button id="btn-sit">Сидит</button><button id="btn-walk">Ходит (анимация)</button></div>
     <div class="row">
       <button id="btn-random">Случайный окрас</button>
       <button id="btn-reset">Сбросить</button>
     </div>
-    <div class="hdr">Код окраса (24 блока)</div>
-    <div class="row"><textarea id="code-in" placeholder="вставь код из CatWar и нажми «Применить код»"></textarea></div>
-    <div class="row"><button id="btn-apply">Применить код</button> <span class="note">формат CatWar: блок = <code>слой-слой-…</code>, слой = <code>id/цвет|прозр0-10</code> или <code>цвет|прозр0-10</code>; <code>0</code> = пусто; |p → 50..100%</span></div>
-    <div class="row"><textarea id="code-out" readonly></textarea></div>
-    <div class="note" id="skip-note" style="display:none;color:#933"></div>
+    <details class="catwar-code">
+      <summary class="hdr">Код окраса (24 блока)</summary>
+      <div class="row"><textarea id="code-in" placeholder="вставь код из CatWar и нажми «Применить код»"></textarea></div>
+      <div class="row"><button id="btn-apply">Применить код</button> <span class="note">формат CatWar: блок = <code>слой-слой-…</code>, слой = <code>id/цвет|прозр0-10</code> или <code>цвет|прозр0-10</code>; <code>0</code> = пусто; |p → 50..100%</span></div>
+      <div class="row"><textarea id="code-out" readonly></textarea></div>
+      <div class="note" id="skip-note" style="display:none;color:#933"></div>
+    </details>
   </div>
 
   <div class="panel" id="model-panel">
@@ -106,8 +110,11 @@
 const M = CATWAR_MANIFEST;
 const W = 100, H = 150;
 const cv = document.getElementById('main');
-cv.style.width  = Math.round(W * 2.4) + 'px';
-cv.style.height = Math.round(H * 2.4) + 'px';
+// превью окраса-референса CatWar уменьшено до 1.6x (меньше модели M2 2.4x):
+// решение заказчицы «поменьше внимания окрасу catwar» (2026-11-05) — блок не главный акцент страницы
+const MAIN_SCALE = 1.6;
+cv.style.width  = Math.round(W * MAIN_SCALE) + 'px';
+cv.style.height = Math.round(H * MAIN_SCALE) + 'px';
 const ctx = cv.getContext('2d');
 const buf = document.createElement('canvas'); buf.width = W; buf.height = H;
 const bctx = buf.getContext('2d');
