@@ -19,6 +19,12 @@ jobs:
     steps:
       # SHA-пин вместо плавающего тега v4 (конвенция org gertha-puzik)
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Гейт — прямой пуш в main не деплоится (kns-main-guard)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: python3 tools/main_guard.py gate "$SHA"
       - name: Заливка каталога www
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
