@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>KNS — Студия кадров</title>
+<style>
+:root{--bg:#1e1e22;--card:#26262b;--card2:#2b2d31;--line:#3a3d42;--dim:#888;--gold:#ffd54f;--green:#9ee493;--red:#ff8a80;--yellow:#ffe082}
+*{box-sizing:border-box}
+body{font:13px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:#e8e8e8;margin:0;padding:16px}
+#wrap{max-width:960px;margin:0 auto}
+h1{font-size:19px;margin:2px 0 5px;color:var(--gold)}
+.note{color:#aaa;font-size:12px;max-width:700px;margin:0 0 14px}
+h2{font-size:15px;color:var(--gold);margin:0 0 9px;font-weight:600}
+h3{font-size:13px;color:var(--gold);margin:14px 0 4px;font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:14px}
+button{background:#3d4046;color:#fff;border:0;border-radius:7px;padding:5px 11px;cursor:pointer;font:inherit;margin:2px 2px 2px 0}
+button:hover{background:#4a4e55}
+button[disabled]{opacity:.4;cursor:default}
+select{background:var(--card2);color:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;margin:2px 0}
+kbd{background:var(--card2);border:1px solid var(--line);border-radius:4px;padding:0 4px;font:11px monospace}
+/* —— зона загрузки —— */
+#dz{border:2px dashed #4a4e55;border-radius:12px;padding:24px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+#dz.hover,#dz:hover{border-color:var(--gold);background:var(--card2)}
+.dz-t{font-size:16px;font-weight:600;color:#eee}
+.dz-s{color:#888;font-size:12px;margin:6px 0}
+.hintline{color:#888;font-size:11px;margin-top:8px;line-height:1.45}
+#toasts{margin-top:6px}
+.toast{display:inline-block;margin:2px 4px 2px 0;padding:3px 9px;border-radius:8px;background:#3d4046;border:1px solid #555;font-size:12px;color:#ddd;max-width:100%}
+.toast.warn{background:#5a1e1e;border-color:#7a3030;color:var(--red)}
+/* —— прогресс —— */
+.pbig{font-size:22px;margin-bottom:8px}
+.pbig b{color:var(--gold);font-size:26px}
+.pleft{color:#bbb;font-size:12px;margin-top:5px}
+.pleft b{color:#ddd}
+#bar{height:10px;border-radius:6px;background:#191a1d;overflow:hidden;border:1px solid var(--line)}
+#barfill{height:100%;width:0%;background:var(--green);transition:width .25s}
+.cnt{color:#888;font-weight:400;font-size:12px}
+.rows{margin-top:2px}
+.fs-row{display:flex;align-items:center;gap:8px;padding:3px 6px;border-bottom:1px solid #32343a}
+.fs-thumb{width:24px;height:36px;border:1px dashed #4a4e55;border-radius:4px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.fs-thumb.none{opacity:.4}
+.fs-thumb canvas{image-rendering:pixelated}
+.fs-name{font:11px monospace;color:#999;flex:0 0 auto}
+.fs-name.on{color:var(--green)}
+.fs-lab{font-size:12px;color:#ccc;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fs-badge{flex:0 0 auto;font-size:10px;padding:1px 7px;border-radius:7px;background:#4a3b12;border:1px solid var(--gold);color:var(--gold)}
+.fs-status{flex:0 0 auto;font-size:11px;text-align:right;color:#777}
+.fs-status.on{font-weight:600}
+.fs-status.r-good{color:var(--green)}
+.fs-status.r-mid{color:var(--yellow)}
+.fs-status.r-bad{color:var(--red)}
+/* —— анимация —— */
+.anrow{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.anrow>div:first-child{flex:0 0 300px}
+.t{color:var(--gold);font-weight:600;margin:10px 0 3px;font-size:12px}
+.anrow .t:first-child{margin-top:0}
+.toolsel{display:inline-block;padding:3px 11px;border-radius:7px;background:var(--card2);border:1px solid var(--line);cursor:pointer;margin:2px 2px 2px 0}
+.toolsel.on{background:#3d4046;outline:2px solid var(--gold)}
+label.ck{color:#ccc;font-size:12px;cursor:pointer;margin-left:10px;white-space:nowrap}
+label.ck input{accent-color:var(--gold)}
+#msw.dim{opacity:.4}
+input[type=range]{vertical-align:middle;width:130px}
+.anmeta{margin-top:10px;color:#ccc;font-size:12px}
+.anmeta b{color:var(--gold)}
+#cvwrap{position:relative;display:grid;line-height:0;background:var(--card)}
+#acv,#acv-old{grid-area:1/1;image-rendering:pixelated;border:2px solid #444;background:repeating-conic-gradient(#26282c 0 25%,#1b1c1f 0 50%) 0/12px 12px}
+#oldbadge,#znfail{position:absolute;top:8px;right:8px;line-height:1.35;font-size:11px;padding:2px 9px;border-radius:8px;display:none}
+#oldbadge{background:#4a3b12;border:1px solid var(--gold);color:var(--gold)}
+#znfail{top:auto;bottom:8px;background:#5a1e1e;border:1px solid #7a3030;color:var(--red)}
+/* —— инструкция —— */
+summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--gold)}
+.ins-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ichi{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:5px 11px;font-size:12px;color:#ddd}
+.send{margin-top:10px;color:var(--green);font-size:12px}
+.lg{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.lgi{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:3px 9px;font-size:11px;max-width:100%}
+.lgs{width:16px;height:16px;border-radius:4px;flex:0 0 auto;border:1px solid #555}
+.lgh{font:11px monospace;color:var(--gold);flex:0 0 auto}
+.lgl{color:#bbb;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+footer{color:#777;font-size:11px;text-align:center;padding:10px 0 4px}
+@media (max-width:700px){.anrow>div:first-child{flex:1 1 100%}}
+</style>
+</head>
+<body>
+<div id="wrap">
+<h1>Студия кадров KNS</h1>
+<p class="note">Твой рабочий стол для кадров модельки: загрузи свои PNG по списку, сверься с чеклистом и посмотри walk-анимацию. Всё считается прямо здесь, в браузере.</p>
+
+<section class="card">
+ <h2>1 · Загрузка кадров</h2>
+ <div id="dz">
+  <div class="dz-t">Перетащи сюда кадры PNG</div>
+  <div class="dz-s">или</div>
+  <div>
+   <button id="pickfiles">выбрать файлы</button>
+   <button id="pickdir">выбрать папку</button>
+  </div>
+  <div class="hintline">Файлы живут только в памяти страницы: перезагрузишь — начнёшь заново.<br>
+  Матчинг — по имени файла (регистр не важен, суффиксы вида « (1)» прощаются). Не-каталожные имена молча пропускаются — счётчик не портится.</div>
+ </div>
+ <input type="file" id="fin" multiple accept="image/png,image/*" hidden>
+ <input type="file" id="findir" webkitdirectory hidden>
+ <div id="toasts"></div>
+</section>
+
+<section class="card">
+ <h2>2 · Прогресс</h2>
+ <div class="pbig">Загружено <b id="pnum">0</b> из <b id="ptot">0</b></div>
+ <div id="bar"><div id="barfill"></div></div>
+ <div class="pleft">осталось <b id="pleft">0</b></div>
+ <div id="buildsec"></div>
+</section>
+
+<section class="card">
+ <h2>3 · Анимация</h2>
+ <div class="anrow">
+  <div>
+   <div class="t">Телосложение</div>
+   <select id="selBuild"></select>
+   <div class="t">Последовательность</div>
+   <select id="selSeq"></select>
+   <div class="t">Показ кадра</div>
+   <span class="toolsel on" id="md-draw">как нарисовано</span>
+   <span class="toolsel" id="md-zone">распознать зоны</span>
+   <div class="hintline">«Распознать зоны»: каждый непрозрачный пиксель (альфа &gt; 28) уходит к ближайшему цвету легенды по Евклиду в RGB; дистанция ≤ 100 — зона перекрашивается в её цвет, иначе красный мусор и в зачёт не идёт.</div>
+   <div class="t">Управление</div>
+   <div>
+    <button id="btnPlay">▶ пуск</button>
+    <span id="msw">мс/кадр <input type="range" id="ms" min="60" max="1000" step="10" value="200"> <b id="msv">200</b></span>
+    <label class="ck"><input type="checkbox" id="cw">тайминг CatWar (1000/200/200/300 мс)</label>
+   </div>
+   <div class="anmeta">кадр <b id="fpos">1</b>/<b id="fn">1</b> · тиков <b id="tickn">0</b></div>
+  </div>
+  <div id="cvwrap">
+   <canvas id="acv" width="160" height="240"></canvas>
+   <canvas id="acv-old" width="160" height="240" hidden></canvas>
+   <span id="oldbadge" title="показан исходник каталога — твой кадр ещё не загружен">старый кадр</span>
+   <span id="znfail">исходник на file:// не считывается — зоны покажу у твоего загруженного кадра</span>
+  </div>
+ </div>
+</section>
+
+<details class="card" open>
+ <summary>4 · Инструкция — что рисовать и как вернуть</summary>
+ <div class="ins-chips">
+  <span class="ichi">1 · 1 пиксель — 1 цвет: зона красится плоским цветом своей легенды</span>
+  <span class="ichi">2 · Плоские цвета, без градиентов и полутонов</span>
+  <span class="ichi">3 · Чёрный #000000 — только глаза; контур — например #1a1a1a</span>
+  <span class="ichi">4 · Фон прозрачный, силуэт — твой кот из кадра-референса</span>
+  <span class="ichi">5 · Имена файлов не переименовывай — по ним кадр встаёт на своё место</span>
+  <span class="ichi">6 · Размер любой — при импорте приведётся сам</span>
+ </div>
+ <div class="send">Как отправить: файлы или zip прямо в чат — я прогоню импортёром с QC и верну живое превью.</div>
+ <h3>Легенда зон — 13 цветов</h3>
+ <div id="legend" class="lg"></div>
+</details>
+
+<footer>Всё считается в твоём браузере, файлы никуда не отправляются. KNS · coop-field</footer>
+</div>
+
+<script src="artpack/frames-studio-data.js"></script>
+<script>
+"use strict";
+/* ===== Студия кадров KNS: чеклист 43 кадров + walk-превью + квантование зон =====
+   Работает и на file://, и на проде: только <script src> + <img>, никакого fetch().
+   Зонды для приёмки: window.__fsTick (счётчик кадров), window.__fsErr (ошибки),
+   window.__fsState() (снимок состояния), 43 строки чеклиста .fs-row. */
+
+var D = (typeof FRAMES_STUDIO_DATA !== 'undefined') ? FRAMES_STUDIO_DATA : null;
+if (!D || !D.zones || !D.builds || !D.total) {
+  document.body.innerHTML = '<p style="color:#ff8a80;padding:20px;font:14px system-ui">нет данных: положи artpack/frames-studio-data.js рядом со страницей</p>';
+  throw new Error('no FRAMES_STUDIO_DATA');
+}
+var ERR = []; window.__fsErr = ERR;
+window.addEventListener('error', function (e) { ERR.push(String(e.message || e)); });
+window.__fsTick = 0;
+
+var $ = function (id) { return document.getElementById(id); };
+function show(el, on) { el.style.display = on ? 'block' : 'none'; }
+
+/* ---------- зоны легенды → RGB ---------- */
+var ZONES = D.zones;
+var ZRGB = ZONES.map(function (z) {
+  var h = z.hex.replace('#', '');
+  return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+});
+var TRASH_D2 = 100 * 100;            // порог дистанции до цвета зоны (Евклид, в квадрате)
+var CATWAR = [1000, 200, 200, 300];  // паузы кадров ходьбы CatWar
+
+/* ---------- каталог: имена канонические, матчинг без регистра/суффиксов ---------- */
+var BUILD_LIST = Object.keys(D.builds);
+var FRAME_BY_NAME = {};
+BUILD_LIST.forEach(function (b) {
+  D.builds[b].frames.forEach(function (f) {
+    if (!FRAME_BY_NAME[f.name]) FRAME_BY_NAME[f.name] = { build: b, frame: f };
+  });
+});
+function stemOf(fileName) {
+  var n = String(fileName).toLowerCase();
+  n = n.replace(/\.[a-z0-9]{1,6}$/, '');
+  for (var i = 0; i < 4; i++) n = n.replace(/\s*\(\d+\)\s*$/, '');
+  return n.replace(/\s+/g, ' ').trim();
+}
+var CATALOG = {};                    // stem -> {name, build}
+Object.keys(FRAME_BY_NAME).forEach(function (nm) {
+  var s = stemOf(nm);
+  if (!CATALOG[s]) CATALOG[s] = { name: nm, build: FRAME_BY_NAME[nm].build };
+});
+
+/* ---------- состояние ---------- */
+var LOADED = {};                     // name -> rec{url,img,w,h,zoneCanvas,stats}
+var ORIG = {};                       // name -> исходник {status,img,zoneCanvas,quantFail,zoneTried,cbs}
+var curBuild = BUILD_LIST[0], curSeq = 0, seqPos = 0;
+var playing = false, timer = null, msPerFrame = 200, cwTiming = false, zoneMode = false;
+var CVH = 240;
+
+window.__fsState = function () {
+  var seq = seqOf();
+  return {
+    build: curBuild, seq: curSeq, seqGroup: seq.group, pos: seqPos,
+    seqNames: seq.frames.slice(), playing: playing, msPerFrame: msPerFrame,
+    cwTiming: cwTiming, zoneMode: zoneMode,
+    loaded: Object.keys(LOADED).length, total: D.total, tick: window.__fsTick
+  };
+};
+
+/* ---------- тосты ---------- */
+function toast(msg, warn) {
+  var host = $('toasts'), t = document.createElement('div');
+  t.className = 'toast' + (warn ? ' warn' : '');
+  t.textContent = msg;
+  host.appendChild(t);
+  while (host.children.length > 6) host.removeChild(host.firstChild);
+  setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 6000);
+}
+
+/* ---------- квантование пикселей по зонам легенды ---------- */
+function quantize(id) {
+  var d = id.data, op = 0, zn = 0;
+  for (var p = 0; p < d.length; p += 4) {
+    if (d[p + 3] <= 28) continue;    // полупрозрачный край не считаем
+    op++;
+    var r = d[p], g = d[p + 1], b = d[p + 2], bi = 0, bd = Infinity;
+    for (var z = 0; z < ZRGB.length; z++) {
+      var Z = ZRGB[z], dr = r - Z[0], dg = g - Z[1], db = b - Z[2], q = dr * dr + dg * dg + db * db;
+      if (q < bd) { bd = q; bi = z; }
+    }
+    if (bd <= TRASH_D2) {
+      var W = ZRGB[bi];
+      d[p] = W[0]; d[p + 1] = W[1]; d[p + 2] = W[2]; d[p + 3] = 255;
+      zn++;
+    } else {                          // мусор: красный полупрозрачный, в зачёт не идёт
+      d[p] = 255; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 140;
+    }
+  }
+  return { opaque: op, zoned: zn, R: op ? Math.round(100 * zn / op) : 0 };
+}
+
+/* ---------- приём файлов (input change и drop проходят один путь) ---------- */
+function isImageName(nm) { return /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(nm); }
+function handleFiles(list) {
+  if (!list || !list.length) return;
+  var pending = 0, accepted = 0;
+  for (var i = 0; i < list.length; i++) {
+    var f = list[i]; if (!f) continue;
+    var nm = f.name || String(f);
+    if (nm.charAt(0) === '.') continue;                       // .DS_Store и скрытые — молча
+    if (!isImageName(nm)) {
+      if (CATALOG[stemOf(nm)]) toast(nm + ': не картинка — пропущено', 1);
+      else toast('имя ' + nm + ' не из списка, пропущено', 1);
+      continue;
+    }
+    var cat = CATALOG[stemOf(nm)];
+    if (!cat) { toast('имя ' + nm + ' не из списка, пропущено', 1); continue; }
+    pending++; accepted++;
+    loadFile(cat.name, f, function () {
+      pending--;
+      if (pending === 0 && accepted > 0) toast('добавлено кадров: ' + accepted);
+    });
+  }
+  if (accepted === 0 && pending === 0) return;
+}
+function loadFile(name, file, done) {
+  var url = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function () {
+    var rec = makeRec(name, file, url, img);
+    if (!rec) {
+      URL.revokeObjectURL(url);
+      toast('не понял файл ' + name + ' — пропущено', 1);
+    } else {
+      var old = LOADED[name];
+      LOADED[name] = rec;                                     // повторная загрузка = перезапись
+      if (old && old.url) URL.revokeObjectURL(old.url);
+      renderProgress(); renderAnim();
+      toast('готово: ' + name + ' · распознано ' + rec.stats.R + '%');
+    }
+    if (done) done();
+  };
+  img.onerror = function () {
+    URL.revokeObjectURL(url);
+    toast('не прочитался файл ' + name, 1);
+    ERR.push('img decode: ' + name);
+    if (done) done();
+  };
+  img.src = url;
+}
+function makeRec(name, file, url, img) {
+  var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  if (!w || !h) return null;
+  var rec = { name: name, file: file, url: url, img: img, w: w, h: h, zoneCanvas: null, stats: { opaque: 0, zoned: 0, R: 0 } };
+  try {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+    var id = x.getImageData(0, 0, w, h);        // её файл — same-origin, file:// не мешает
+    rec.stats = quantize(id);
+    x.putImageData(id, 0, 0);                  // id мутирован на месте → канвас и есть режим зон
+    rec.zoneCanvas = c;
+  } catch (e) {                                 // на всякий случай: кадр живёт, зоны — нет
+    ERR.push('зоны кадра ' + name + ': ' + e);
+  }
+  return rec;
+}
+
+/* ---------- чеклист-прогресс (идемпотентная пересборка) ---------- */
+function renderProgress() {
+  var n = Object.keys(LOADED).length, total = D.total;
+  $('ptot').textContent = String(total);
+  $('pnum').textContent = String(n);
+  $('pleft').textContent = String(total - n);
+  $('barfill').style.width = (100 * n / total) + '%';
+  BUILD_LIST.forEach(function (b) {
+    var host = $('rows-' + b);
+    host.innerHTML = '';
+    D.builds[b].frames.forEach(function (f) { host.appendChild(rowFor(f)); });
+  });
+}
+function rowFor(f) {
+  var rec = LOADED[f.name];
+  var row = document.createElement('div');
+  row.className = 'fs-row'; row.dataset.name = f.name;
+  var th = document.createElement('span');
+  th.className = 'fs-thumb' + (rec ? '' : ' none');
+  if (rec) {
+    var t = document.createElement('canvas'); t.width = 24; t.height = 36;
+    var tx = t.getContext('2d'); tx.imageSmoothingEnabled = false;
+    var s = Math.min(24 / rec.w, 36 / rec.h);
+    var dw = Math.max(1, Math.round(rec.w * s)), dh = Math.max(1, Math.round(rec.h * s));
+    tx.drawImage(rec.img, Math.round((24 - dw) / 2), Math.round((36 - dh) / 2), dw, dh);
+    th.appendChild(t);
+  }
+  var nm = document.createElement('span');
+  nm.className = 'fs-name' + (rec ? ' on' : ''); nm.textContent = f.name;
+  var lab = document.createElement('span');
+  lab.className = 'fs-lab'; lab.textContent = f.label; lab.title = f.label;
+  row.appendChild(th); row.appendChild(nm); row.appendChild(lab);
+  if (!f.hasMarkup) {
+    var bd = document.createElement('span');
+    bd.className = 'fs-badge'; bd.title = 'канонической разметки зон нет — важен каждый пиксель';
+    bd.textContent = 'разметка с нуля';
+    row.appendChild(bd);
+  }
+  var st = document.createElement('span');
+  st.className = 'fs-status' + (rec ? ' on' : '');
+  if (rec) {
+    var R = rec.stats.R;
+    var cls = R >= 70 ? 'r-good' : (R >= 40 ? 'r-mid' : 'r-bad');
+    var extra = R >= 70 ? '' : (R >= 40 ? ' — много неразпознанного' : ' — почти всё вне легенды');
+    st.classList.add(cls);
+    st.textContent = '✅ загружен · распознано ' + R + '%' + extra;
+  } else st.textContent = '⏳ не загружен';
+  row.appendChild(st);
+  return row;
+}
+function buildSections() {
+  var host = $('buildsec'); host.innerHTML = '';
+  BUILD_LIST.forEach(function (b) {
+    var sec = document.createElement('section');
+    var h = document.createElement('h3');
+    h.textContent = D.builds[b].label;
+    var cnt = document.createElement('span'); cnt.className = 'cnt';
+    cnt.textContent = ' (' + D.builds[b].frames.length + ')';
+    h.appendChild(cnt);
+    var rows = document.createElement('div'); rows.className = 'rows'; rows.id = 'rows-' + b;
+    sec.appendChild(h); sec.appendChild(rows); host.appendChild(sec);
+  });
+}
+
+/* ---------- исходники каталога (лениво, для невыгруженных кадров) ---------- */
+function getOrig(name, cb) {
+  var o = ORIG[name];
+  if (!o) {
+    o = ORIG[name] = { status: 'loading', img: null, zoneCanvas: null, quantFail: false, zoneTried: false, cbs: [] };
+    var f = FRAME_BY_NAME[name].frame, img = new Image();
+    img.onload = function () { o.img = img; o.status = 'ready'; o.cbs.splice(0).forEach(function (c) { c(); }); };
+    img.onerror = function () { o.status = 'error'; ERR.push('исходник не открылся: ' + f.src); o.cbs.splice(0).forEach(function (c) { c(); }); };
+    img.src = f.src;                                  // только относительный путь, файл за кадром не ходит
+  }
+  if (o.status !== 'loading') cb(); else o.cbs.push(cb);
+}
+function origZone(name, cb) {
+  getOrig(name, function () {
+    var o = ORIG[name];
+    if (o.status !== 'ready') { cb(null); return; }
+    if (o.zoneTried) { cb(o.zoneCanvas || null); return; }
+    o.zoneTried = true;
+    try {
+      var w = o.img.naturalWidth || o.img.width, h = o.img.naturalHeight || o.img.height;
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      var x = c.getContext('2d'); x.drawImage(o.img, 0, 0);
+      var id = x.getImageData(0, 0, w, h);            // на file:// может кинуть SecurityError
+      quantize(id); x.putImageData(id, 0, 0);
+      o.zoneCanvas = c; cb(c);
+    } catch (e) {
+      o.quantFail = true;
+      ERR.push('зоны исходника недоступны (' + name + '): ' + e);
+      cb(null);
+    }
+  });
+}
+
+/* ---------- анимация ----------
+   Два канваса: #acv — только её файлы (не портится кросс-тайнтом, пиксельные
+   пробы чисты на file://), #acv-old — исходники каталога (может быть tainted). */
+function seqOf() { return D.builds[curBuild].seqs[curSeq]; }
+function frameDelay(i, n) { return (cwTiming && n === 4) ? CATWAR[i % 4] : msPerFrame; }
+function updPlayBtn() {
+  var can = seqOf().frames.length > 1, btn = $('btnPlay');
+  btn.disabled = !can;
+  btn.textContent = playing ? '⏸ пауза' : '▶ пуск';
+}
+function reschedule() {
+  if (timer) { clearTimeout(timer); timer = null; }
+  if (playing) {
+    var seq = seqOf(), n = seq.frames.length;
+    if (n < 2) { playing = false; updPlayBtn(); return; }
+    timer = setTimeout(function () {
+      var s2 = seqOf(), n2 = s2.frames.length;       // последовательность могла смениться
+      if (!playing || n2 < 2) return;
+      seqPos = (seqPos + 1) % n2;
+      window.__fsTick++;
+      renderAnim();
+      reschedule();
+    }, frameDelay(seqPos, n));
+  }
+}
+function renderAnim() {
+  var seq = seqOf(), name = seq.frames[seqPos], f = FRAME_BY_NAME[name].frame;
+  var n = seq.frames.length;
+  var w = Math.max(1, Math.round(CVH * f.w / f.h));
+  var cvU = $('acv'), cvO = $('acv-old');
+  var ux = cvU.getContext('2d'), ox = cvO.getContext('2d');
+  cvU.width = w; cvU.height = CVH; cvO.width = w; cvO.height = CVH;
+  ux.imageSmoothingEnabled = false; ox.imageSmoothingEnabled = false;
+  ux.clearRect(0, 0, w, CVH); ox.clearRect(0, 0, w, CVH);
+  show($('oldbadge'), false); show($('znfail'), false);
+  $('fpos').textContent = String(seqPos + 1);
+  $('fn').textContent = String(n);
+  $('tickn').textContent = String(window.__fsTick);
+  var rec = LOADED[name];
+  if (rec) {
+    cvU.hidden = false; cvO.hidden = true;
+    ux.drawImage(zoneMode && rec.zoneCanvas ? rec.zoneCanvas : rec.img, 0, 0, w, CVH);
+    return;
+  }
+  cvU.hidden = true; cvO.hidden = false;
+  placeholder(ox, 'кадр грузится…');
+  getOrig(name, function () {
+    var o = ORIG[name];
+    if (seqOf().frames[seqPos] !== name || LOADED[name]) return;
+    if (o.status !== 'ready') { placeholder(ox, 'исходник не открылся'); show($('oldbadge'), true); return; }
+    ox.clearRect(0, 0, cvO.width, cvO.height);
+    ox.imageSmoothingEnabled = false;
+    ox.globalAlpha = 0.45;                          // «старый кадр»: приглушаем исходник
+    ox.drawImage(o.img, 0, 0, cvO.width, cvO.height);
+    ox.globalAlpha = 1;
+    if (zoneMode) {
+      origZone(name, function (zc) {
+        if (seqOf().frames[seqPos] !== name || LOADED[name]) return;
+        ox.clearRect(0, 0, cvO.width, cvO.height);
+        ox.imageSmoothingEnabled = false;
+        ox.globalAlpha = 0.45;
+        if (zc) ox.drawImage(zc, 0, 0, cvO.width, cvO.height);
+        else {
+          ox.drawImage(o.img, 0, 0, cvO.width, cvO.height);
+          show($('znfail'), true);                  // file://: исходник не считывается
+        }
+        ox.globalAlpha = 1;
+      });
+    }
+    show($('oldbadge'), true);
+  });
+}
+function placeholder(x, txt) {
+  x.clearRect(0, 0, 5000, 5000);
+  x.fillStyle = '#777';
+  x.font = '12px system-ui,sans-serif';
+  x.textAlign = 'center';
+  x.fillText(txt, x.canvas.width / 2, x.canvas.height / 2);
+  x.textAlign = 'left';
+}
+
+/* ---------- селекты ---------- */
+function initBuildSelect() {
+  var sb = $('selBuild');
+  BUILD_LIST.forEach(function (b) {
+    var o = document.createElement('option');
+    o.value = b;
+    o.textContent = D.builds[b].label + ' · ' + D.builds[b].frames.length + ' кадров';
+    sb.appendChild(o);
+  });
+  var idx = BUILD_LIST.indexOf('norm');
+  if (idx >= 0) { sb.value = 'norm'; curBuild = 'norm'; } else curBuild = BUILD_LIST[0];
+}
+function buildSeqSelect() {
+  var ss = $('selSeq'); ss.innerHTML = '';
+  if (curSeq >= D.builds[curBuild].seqs.length) curSeq = 0;
+  D.builds[curBuild].seqs.forEach(function (sq, i) {
+    var n = sq.frames.length;
+    var o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = sq.group + (n === 1 ? ' — 1 кадр (статично)' : ' — цикл, ' + n + ' кадра');
+    ss.appendChild(o);
+  });
+  ss.value = String(curSeq);
+}
+
+/* ---------- события ---------- */
+$('selBuild').addEventListener('change', function () {
+  curBuild = this.value; curSeq = 0; seqPos = 0;
+  buildSeqSelect(); renderAnim(); updPlayBtn(); reschedule();
+});
+$('selSeq').addEventListener('change', function () {
+  curSeq = +this.value; seqPos = 0;
+  renderAnim(); updPlayBtn(); reschedule();
+});
+$('btnPlay').addEventListener('click', function () {
+  if (seqOf().frames.length < 2) return;
+  playing = !playing; updPlayBtn(); reschedule();
+});
+$('ms').addEventListener('input', function () {
+  msPerFrame = +this.value;
+  $('msv').textContent = String(msPerFrame);
+  reschedule();
+});
+$('cw').addEventListener('change', function () {
+  cwTiming = this.checked;
+  $('ms').disabled = cwTiming;
+  $('msw').classList.toggle('dim', cwTiming);
+  reschedule();
+});
+function setMode(z) {
+  zoneMode = z;
+  $('md-draw').classList.toggle('on', !z);
+  $('md-zone').classList.toggle('on', z);
+  show($('znfail'), false);
+  renderAnim();
+}
+$('md-draw').addEventListener('click', function () { setMode(false); });
+$('md-zone').addEventListener('click', function () { setMode(true); });
+
+/* зона загрузки: и клик, и drop, и input.change — один путь */
+var dz = $('dz');
+dz.addEventListener('click', function () { $('fin').click(); });
+$('pickfiles').addEventListener('click', function (e) { e.stopPropagation(); $('fin').click(); });
+$('pickdir').addEventListener('click', function (e) { e.stopPropagation(); $('findir').click(); });
+$('fin').addEventListener('change', function () { handleFiles(this.files); this.value = ''; });
+$('findir').addEventListener('change', function () { handleFiles(this.files); this.value = ''; });
+dz.addEventListener('dragover', function (e) { e.preventDefault(); e.stopPropagation(); dz.classList.add('hover'); });
+dz.addEventListener('dragleave', function () { dz.classList.remove('hover'); });
+dz.addEventListener('drop', function (e) {
+  e.preventDefault(); e.stopPropagation(); dz.classList.remove('hover');
+  var dt = e.dataTransfer; if (!dt) return;
+  try {
+    $('fin').files = dt.files;                       // программный путь: input.files + change
+    $('fin').dispatchEvent(new Event('change'));
+  } catch (_) { handleFiles(dt.files); }
+});
+document.addEventListener('dragover', function (e) { e.preventDefault(); });
+document.addEventListener('drop', function (e) { e.preventDefault(); });
+
+/* ---------- легенда ---------- */
+function renderLegend() {
+  var host = $('legend'); host.innerHTML = '';
+  ZONES.forEach(function (z) {
+    var it = document.createElement('span'); it.className = 'lgi';
+    var sw = document.createElement('span'); sw.className = 'lgs'; sw.style.background = z.hex;
+    var hex = document.createElement('span'); hex.className = 'lgh'; hex.textContent = z.hex.toUpperCase();
+    var lb = document.createElement('span'); lb.className = 'lgl'; lb.textContent = z.label; lb.title = z.label;
+    it.appendChild(sw); it.appendChild(hex); it.appendChild(lb);
+    host.appendChild(it);
+  });
+}
+
+/* ---------- инициализация ---------- */
+renderLegend();
+buildSections();
+initBuildSelect();
+buildSeqSelect();
+renderProgress();
+updPlayBtn();
+renderAnim();
+</script>
+</body>
+</html>
