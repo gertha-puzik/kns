@@ -1,0 +1,768 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>KNS — редактор разметки зон</title>
+<style>
+body{font:13px/1.45 system-ui,sans-serif;background:#1e1f22;color:#e8e8e8;margin:0;padding:14px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+h1{font-size:16px;margin:0 0 6px}
+.note{color:#aaa;font-size:12px;max-width:640px;margin:0 0 10px}
+#side{flex:0 0 350px;max-width:350px}
+#stage{flex:0 0 auto}
+.t{color:#ffd54f;font-weight:600;margin:10px 0 4px}
+select,button{background:#3d4046;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;font:inherit;margin:2px 2px 2px 0}
+select{background:#2b2d31;border:1px solid #3a3d42}
+button:hover{background:#4a4e55}
+button.warn{background:#5a3a3a}
+#zonelist{display:flex;flex-direction:column;gap:2px}
+.zone{display:flex;align-items:center;gap:7px;padding:3px 8px;border-radius:7px;background:#2b2d31;border:1px solid #3a3d42;cursor:pointer}
+.zone.target{outline:2px solid #ffd54f;background:#33363c}
+.zone.off{opacity:.45}
+.sw{width:14px;height:14px;border-radius:4px;flex:0 0 auto;border:1px solid #555}
+.zl{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zc{color:#9ee493;font:11px monospace;flex:0 0 auto}
+.zd{font:11px monospace;flex:0 0 auto;width:44px;text-align:right}
+.zd.pos{color:#9ee493}.zd.neg{color:#ff8a80}.zd.zero{color:#666}
+.eye{flex:0 0 auto;font-size:12px;width:22px;text-align:center;color:#999;border-radius:4px;padding:1px 2px}
+.eye:hover{background:#444}
+#qcpanel{background:#2b2d31;border:1px solid #3a3d42;border-radius:9px;padding:8px 10px;margin-top:4px}
+.qrow{display:flex;justify-content:space-between;font:11px monospace;color:#ccc;padding:1px 0}
+.qbad{color:#ff8a80}.qok{color:#9ee493}
+.chip{display:inline-block;border-radius:7px;padding:2px 9px;font-weight:600;margin-bottom:4px}
+.chip.ok{background:#1b4621;color:#b9f6ca}.chip.err{background:#5a1e1e;color:#ff8a80}
+#stab{font:10px monospace;border-collapse:collapse;margin-top:4px}
+#stab td,#stab th{border:1px solid #3a3d42;padding:1px 5px;text-align:right}
+#stab th{color:#ffd54f}
+#stab .warnspot{color:#ff8a80}
+#cvwrap{position:relative;display:inline-block;line-height:0}
+#cv{image-rendering:pixelated;border:2px solid #444;cursor:crosshair;background:
+ repeating-conic-gradient(#26282c 0 25%,#1e1f22 0 50%) 0/16px 16px}
+#cur{position:absolute;left:2px;top:2px;pointer-events:none}
+canvas{display:block}
+.hint{color:#888;font-size:11px;line-height:1.5;max-width:640px;margin-top:6px}
+kbd{background:#2b2d31;border:1px solid #3a3d42;border-radius:4px;padding:0 4px;font:11px monospace}
+#editsbox{max-height:130px;overflow:auto;font:10px monospace;color:#9ee493;background:#222327;border:1px solid #3a3d42;border-radius:7px;padding:6px;margin-top:4px}
+#restore-bar{background:#4a3b12;border:1px solid #ffd54f;border-radius:9px;padding:7px 12px;margin-bottom:8px;display:none;max-width:640px}
+#restore-bar button{margin-left:12px}
+.toolsel{display:inline-block;padding:3px 10px;border-radius:7px;background:#2b2d31;border:1px solid #3a3d42;cursor:pointer;margin:2px 2px 2px 0}
+.toolsel.on{background:#3d4046;outline:2px solid #ffd54f}
+label.ck{color:#ccc;font-size:12px;margin-right:10px;cursor:pointer}
+a{color:#9ad}
+</style></head><body>
+<div id="side">
+<h1>Редактор разметки зон</h1>
+<div class="note">Правь зоны кистью на кадре модельки; твои правки — канон для ИИ-конвейера. QC считается на лету: сумма зон = силуэт, дыр/вне/пересечений быть не должно.</div>
+<div id="restore-bar"><span id="restore-txt"></span><button id="restore-drop" class="warn">Сбросить всё</button><button id="restore-keep">Оставить</button></div>
+<div class="t">Телосложение и кадр</div>
+<select id="build"></select> <select id="frame"></select>
+<div class="t">Зоны (клик — выбрать кисть, глаз — спрятать)</div>
+<div id="zonelist"></div>
+<div class="t">Инструменты</div>
+<div>
+ <span class="toolsel" id="tool-brush" title="B">🖌 Кисть</span>
+ <span class="toolsel" id="tool-fill" title="F"> ведро</span>
+ <span class="toolsel" id="tool-erase" title="E">ластик</span>
+ <span class="toolsel" id="tool-pick" title="P">пипетка</span>
+ радиус <input type="range" id="radius" min="1" max="4" step="1" value="1" style="width:80px;vertical-align:middle"> <span id="radiusv">1</span>
+ <label class="ck"><input type="checkbox" id="grid">сетка</label>
+ <label class="ck"><input type="checkbox" id="hideall">скрыть зоны</label>
+ зум <select id="zoom"><option>2</option><option>3</option><option selected>4</option><option>6</option><option>8</option></select>
+</div>
+<div id="qcpanel"><div class="t" style="margin-top:0">QC на лету</div><div id="qchost"></div></div>
+<div id="stability"></div>
+<div class="t">Правки сессии</div>
+<div id="editsbox">— правок нет —</div>
+<div class="t">Действия</div>
+<div>
+ <button id="undo">↩ отменить</button><button id="redo">↪ вернуть</button>
+ <button id="resetcur" class="warn">кадр к канону</button><button id="resetall" class="warn">сбросить всё</button>
+</div>
+<div class="t">Экспорт</div>
+<div>
+ <button id="dlcanon" title="полный файл масок телосложения в канон-формате">⇩ канон-JSON (сборка)</button>
+ <button id="dlpack" title="только изменённые кадры + QC + PNG">⇩ пакет правок</button>
+</div>
+<div style="color:#888;font-size:11px;margin-top:4px"><label>⇧ подхватить свежие маски JSON: <input type="file" id="loadmasks" accept=".json,application/json"></label></div>
+<div class="note" id="extnote" style="display:none"></div>
+</div>
+<div id="stage">
+ <div id="cvwrap"><canvas id="cv"></canvas><canvas id="cur"></canvas></div>
+ <div class="hint"><kbd>ЛКМ</kbd> — инструмент по клику · <kbd>ПКМ</kbd> — всегда ластик (снять зону: пиксель уходит «телу», с «тела» — дыра, QC зажжётся) · <kbd>Alt+ЛКМ</kbd> — пипетка · <kbd>колесо</kbd> — зум · ластик работает и режимом.<br>
+ Заливка: клик перекрашивает связный пятак одной зоны в выбранную. Правки живут в браузере (автосейв), после «пакета правок» файл отдай ИИ-конвейеру (kanban-карточке) — он продолжит канон.</div>
+</div>
+<script src="artpack/mask-annotator-data.js"></script>
+<script>
+"use strict";
+/* ===== редактор разметки зон масок (заказчица → ИИ-конвейер) =====
+   Формат собственников пикселя: own[i] = -2 вне силуэта, -1 дыра (QC), 0..10 зона.
+   Приоритет вычитания (канон): глаза→уши→нос→хвост→лапы→голова→светлые→тело. */
+const D = (typeof KNS_MASK_ANNOTATOR_DATA !== 'undefined') ? KNS_MASK_ANNOTATOR_DATA : null;
+if (!D || D.format !== 1) { document.body.innerHTML = '<p style="color:#f88">нет данных: artpack/mask-annotator-data.js не найден</p>'; throw new Error('no data'); }
+const ERR = []; window.__annErr = ERR;
+window.addEventListener('error', function (e) { ERR.push(String(e.message || e)); });
+
+const PALETTE = {
+  tail:['#d32f2f',211,47,47], body:['#7b1fa2',123,31,162], head:['#fbc02d',251,192,45],
+  fore:['#388e3c',56,142,60], hind:['#0288d1',2,136,209], earL:['#f48fb1',244,143,177],
+  earR:['#ff7043',255,112,67], nose:['#ffeb3b',255,235,59], chest:['#e1bee3',225,190,227],
+  belly:['#b2dfdb',178,223,219], eyes:['#000000',0,0,0]
+};
+const ZONES = D.zones;                       // [{id,label}] — порядок = приоритет (индекс 0 = высший)
+const ZIDX = {}; ZONES.forEach(function (z, i) { ZIDX[z.id] = i; });
+const DISPLAY = ['tail','body','head','fore','hind','earL','earR','nose','chest','belly','eyes']; // порядок строк как в легендах витрин
+const BODY_ID = ZIDX.body;
+const LS_KEY = 'kns_mask_annotator_edits_v1';
+
+/* ---------- состояние ---------- */
+var BUILD = 'norm', frameIdx = 0, zoom = 4, showGrid = false, hideAll = false;
+var tool = 'brush', radius = 1, target = ZIDX.tail;
+var hidden = {};                                   // zone id -> true (спрятана)
+var IMGS = {};                                     // file -> HTMLImageElement (прекеш каталога)
+var cur = null;                                    // {entry,w,h,own,base,sil,img,outside0,inter0}
+var EXT = {};                                      // build -> {key:{zone:[...]}} внешние маски
+var EXTAPPLIED = {};                               // build -> список подключённых ключей (для заметки)
+var EDITS = {};                                    // editId -> {build,file,label,key,w,h,layers,editId,t}
+var undoStack = [], redoStack = [], strokeSnap = null;
+
+function zonesLayersFromOwn(own, w, h) {
+  var L = {}; ZONES.forEach(function (z) { L[z.id] = []; });
+  for (var i = 0; i < own.length; i++) { var o = own[i]; if (o >= 0) L[ZONES[o].id].push(i); }
+  return L;
+}
+function entryId(build, e) { return build + ':' + e.file; }
+
+/* ---------- инициализация UI ---------- */
+var $ = function (id) { return document.getElementById(id); };
+function buildBuildSelect() {
+  var s = $('build'); s.innerHTML = '';
+  Object.keys(D.buildLabels).forEach(function (b) {
+    var o = document.createElement('option'); o.value = b; o.textContent = D.buildLabels[b]; if (b === BUILD) o.selected = true; s.appendChild(o);
+  });
+}
+function buildFrameSelect() {
+  var s = $('frame'); s.innerHTML = ''; var lastGroup = null, og = null;
+  D.builds[BUILD].forEach(function (e, i) {
+    if (e.group !== lastGroup) { og = document.createElement('optgroup'); og.label = e.group; lastGroup = e.group; og.dataset.group = e.group; s.appendChild(og); }
+    var o = document.createElement('option'); o.value = i;
+    var ed = (EDITS[entryId(BUILD, e)]) ? ' *' : '';
+    var nm = (e.key === null ? '· ' : '') + e.label + ed;
+    o.textContent = nm; o.value = i; og.appendChild(o);
+  });
+  s.value = frameIdx;
+}
+function zoneRows() {
+  var host = $('zonelist'); host.innerHTML = '';
+  DISPLAY.forEach(function (zid) {
+    var zi = ZIDX[zid], z = ZONES[zi], p = PALETTE[zid];
+    var row = document.createElement('div'); row.className = 'zone' + (zi === target ? ' target' : '') + (hidden[zid] ? ' off' : '');
+    var cnt = 0, dif = 0;
+    if (cur) {
+      for (var i = 0; i < cur.own.length; i++) if (cur.own[i] === zi) cnt++;
+      for (var j = 0; j < cur.base.length; j++) { var b = cur.base[j] === zi ? 1 : 0, n = cur.own[j] === zi ? 1 : 0; if (b !== n) dif += n - b; }
+    }
+    row.innerHTML = '<span class="sw" style="background:' + p[0] + '"></span>' +
+      '<span class="zl">' + z.label + '</span>' +
+      '<span class="zd ' + (dif > 0 ? 'pos' : dif < 0 ? 'neg' : 'zero') + '">' + (dif > 0 ? '+' : '') + dif + '</span>' +
+      '<span class="zc">' + cnt + 'px</span>' +
+      '<span class="eye" title="показать/спрятать">' + (hidden[zid] ? '🚫' : '👁') + '</span>';
+    row.addEventListener('click', function (ev) {
+      if (ev.target.classList.contains('eye')) { hidden[zid] = !hidden[zid]; zoneRows(); render(); return; }
+      target = zi; zoneRows();
+    });
+    host.appendChild(row);
+  });
+}
+
+/* ---------- загрузка кадра ---------- */
+function silhouetteOf(img, w, h) {
+  var c = document.createElement('canvas'); c.width = w; c.height = h;
+  var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  var d; try { d = x.getImageData(0, 0, w, h).data; } catch (e) { ERR.push('getImageData: ' + e); throw e; }
+  var sil = new Uint8Array(w * h);
+  for (var i = 0; i < w * h; i++) sil[i] = d[i * 4 + 3] > 0 ? 1 : 0;
+  return sil;
+}
+function loadEntry(idx, callback) {
+  frameIdx = idx;
+  var e = D.builds[BUILD][idx];
+  if (!IMGS[e.file]) { ERR.push('img not preloaded: ' + e.file); if (callback) callback(); return; }
+  var img = IMGS[e.file];
+  var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  var sil = silhouetteOf(img, w, h);
+  var own = new Int16Array(w * h).fill(-2);
+  for (var i = 0; i < sil.length; i++) if (sil[i]) own[i] = BODY_ID;   // старт: всё — тело
+  var outside0 = 0, inter0 = 0;
+  var key = e.key !== null && EXT[BUILD] && EXT[BUILD][e.key] ? EXT[BUILD][e.key] : null;
+  var extUsed = !!key;
+  if (!extUsed && e.key !== null) key = D.masks[BUILD][e.key] || null;
+  var outMark = new Uint8Array(w * h);
+  if (key) {
+    var listed = {};
+    ZONES.forEach(function (z) { listed[z.id] = 0; });
+    var pri = D.zonePriority;                     // [eyes,earL,...body] высший -> низший
+    pri.forEach(function (zid) {
+      var zi = ZIDX[zid], arr = key[zid] || [];
+      for (var k = 0; k < arr.length; k++) {
+        var px = arr[k];
+        if (px < 0 || px >= w * h || !sil[px]) {
+          if (px >= 0 && px < w * h) { outside0++; outMark[px] = 1; }
+          continue;
+        }
+        own[px] = zi; listed[zid]++;
+      }
+    });
+    var totalListed = 0; pri.forEach(function (zid) { totalListed += (key[zid] || []).length; });
+    var union = 0; for (var q = 0; q < own.length; q++) if (own[q] >= 0) union++;
+    inter0 = totalListed - union - outside0;
+    if (inter0 < 0) inter0 = 0;
+  }
+  cur = { entry: e, w: w, h: h, own: own, base: own.slice(), sil: sil, img: img, outside0: outside0, inter0: inter0, outMark: outMark, extUsed: extUsed };
+  undoStack = []; redoStack = [];
+  var rec = EDITS[entryId(BUILD, e)];
+  if (rec && rec.layers) {                       // восстановить правки поверх канона
+    ZONES.forEach(function (z) { var arr = rec.layers[z.id] || []; for (var k = 0; k < arr.length; k++) { var px = arr[k]; if (px >= 0 && px < w * h && cur.sil[px]) cur.own[px] = ZIDX[z.id]; } });
+    var hs = rec.holes || [];
+    for (var k2 = 0; k2 < hs.length; k2++) { var hp = hs[k2]; if (hp >= 0 && hp < w * h && cur.sil[hp]) cur.own[hp] = -1; }
+  }
+  buildFrameSelect(); zoneRows(); render(); updateQC(); stability();
+  if (callback) callback();
+}
+function inLayers(px, layers) {
+  for (var z in layers) { var a = layers[z]; for (var i = 0; i < a.length; i++) if (a[i] === px) return true; }
+  return false;
+}
+
+/* ---------- отрисовка ---------- */
+var cv = $('cv'), cx = cv.getContext('2d');
+var cu = $('cur'), cc = cu.getContext('2d');
+var off = document.createElement('canvas'), offx = off.getContext('2d');
+var off2 = document.createElement('canvas'), off2x = off2.getContext('2d');
+function render() {
+  if (!cur) return;
+  cv.width = cur.w * zoom; cv.height = cur.h * zoom;
+  cu.width = cv.width; cu.height = cv.height; cu.style.width = cv.style.width; cu.style.height = cv.style.height;
+  cx.imageSmoothingEnabled = false;
+  cx.clearRect(0, 0, cv.width, cv.height);
+  cx.drawImage(cur.img, 0, 0, cv.width, cv.height);
+  if (!hideAll) {
+    off.width = cur.w; off.height = cur.h;
+    var im = offx.createImageData(cur.w, cur.h), dd = im.data;
+    var em = null, ed = null;
+    var holes = (qcCache.holes > 0) || (cur.outside0 > 0);
+    if (holes) { off2.width = cur.w; off2.height = cur.h; em = off2x.createImageData(cur.w, cur.h); ed = em.data; }
+    for (var i = 0; i < cur.own.length; i++) {
+      var o = cur.own[i];
+      if (o >= 0 && !hidden[ZONES[o].id]) {
+        var zid = ZONES[o].id, p = PALETTE[zid];
+        dd[i * 4] = p[1]; dd[i * 4 + 1] = p[2]; dd[i * 4 + 2] = p[3]; dd[i * 4 + 3] = 128;
+      }
+      if (ed) {
+        if (o === -1) { ed[i * 4] = 255; ed[i * 4 + 1] = 30; ed[i * 4 + 2] = 30; ed[i * 4 + 3] = 235; }
+        else if (o === -2 && cur.sil[i] === 0 && cur.outside0 > 0 && cur.outMark && cur.outMark[i]) { ed[i * 4] = 255; ed[i * 4 + 1] = 0; ed[i * 4 + 2] = 255; ed[i * 4 + 3] = 235; }
+      }
+    }
+    offx.clearRect(0, 0, cur.w, cur.h); offx.putImageData(im, 0, 0);
+    cx.drawImage(off, 0, 0, cv.width, cv.height);
+    if (ed) { off2x.clearRect(0, 0, cur.w, cur.h); off2x.putImageData(em, 0, 0); cx.drawImage(off2, 0, 0, cv.width, cv.height); }
+  }
+  if (showGrid && zoom >= 4) {
+    cx.strokeStyle = 'rgba(255,255,255,.09)'; cx.beginPath();
+    for (var gx = 0; gx <= cur.w; gx++) { cx.moveTo(gx * zoom + .5, 0); cx.lineTo(gx * zoom + .5, cv.height); }
+    for (var gy = 0; gy <= cur.h; gy++) { cx.moveTo(0, gy * zoom + .5); cx.lineTo(cv.width, gy * zoom + .5); }
+    cx.stroke();
+  }
+}
+/* курсор кисти на overlay-канве */
+function drawCursor(mx, my) {
+  cc.clearRect(0, 0, cu.width, cu.height);
+  if (mx == null || !cur) return;
+  var r = radius * zoom;
+  cc.strokeStyle = tool === 'erase' ? 'rgba(255,80,80,.95)' : 'rgba(255,255,255,.85)';
+  cc.lineWidth = 1.5;
+  cc.beginPath();
+  cc.arc((mx + .5) * zoom, (my + .5) * zoom, Math.max(r - .5, 1), 0, Math.PI * 2);
+  cc.stroke();
+}
+
+/* ---------- QC ---------- */
+var qcCache = { holes: 0, editsPx: 0 };
+function computeQC() {
+  var holes = 0, counts = [], i;
+  for (var z = 0; z < ZONES.length; z++) counts[z] = 0;
+  for (i = 0; i < cur.own.length; i++) {
+    var o = cur.own[i];
+    if (o === -1) holes++;
+    else if (o >= 0) counts[o]++;
+  }
+  var editsPx = 0;
+  for (i = 0; i < cur.own.length; i++) if (cur.own[i] !== cur.base[i]) editsPx++;
+  qcCache = { holes: holes, editsPx: editsPx, counts: counts };
+  return qcCache;
+}
+function updateQC() {
+  computeQC();
+  var sil = 0; for (var i = 0; i < cur.sil.length; i++) if (cur.sil[i]) sil++;
+  var union = 0; for (var j = 0; j < cur.own.length; j++) if (cur.own[j] >= 0) union++;
+  var bad = qcCache.holes !== 0 || cur.outside0 !== 0 || cur.inter0 !== 0;
+  var html = '<span class="chip ' + (bad ? 'err" title="есть ошибки — смотри красные пиксели на канве' : 'ok') + '">' + (bad ? 'QC: ЕСТЬ ОШИБКИ' : 'QC: ОК') + '</span>';
+  html += qrow('сумма зон / силуэт', union + ' / ' + sil, union === sil);
+  html += qrow('дыры (без зоны)', qcCache.holes, qcCache.holes === 0);
+  html += qrow('вне силуэта (из данных)', cur.outside0, cur.outside0 === 0);
+  html += qrow('пересечения (из данных)', cur.inter0, cur.inter0 === 0);
+  html += qrow('правок в кадре (px)', qcCache.editsPx, null);
+  $('qchost').innerHTML = html;
+}
+function qrow(name, val, good) {
+  var cls = good == null ? '' : good ? 'qok' : 'qbad';
+  return '<div class="qrow"><span>' + name + '</span><span class="' + cls + '">' + val + '</span></div>';
+}
+/* стабильность размеров зон по фазам серии (подсказка, не ошибка) */
+function stability() {
+  var host = $('stability');
+  var e = D.builds[BUILD][frameIdx];
+  var sib = [];
+  D.builds[BUILD].forEach(function (f) { if (f.group === e.group && f.key !== null) sib.push(f); });
+  if (sib.length < 2) { host.innerHTML = ''; return; }
+  var counts = sib.map(function (f) {
+    if (cur && cur.entry.file === f.file) { computeQC(); var c = qcCache.counts.slice(); return c; }
+    var key = (EXT[BUILD] && EXT[BUILD][f.key]) ? EXT[BUILD][f.key] : (D.masks[BUILD][f.key] || null);
+    var c = []; ZONES.forEach(function (z, i) { c[i] = key ? (key[z.id] || []).length : 0; });
+    return c;
+  });
+  var html = '<div class="t">Стабильность зон по фазам (разброс — подсказка)</div><table id="stab"><tr><th>зона</th>';
+  sib.forEach(function (f, i) { html += '<th>' + shortKey(f) + '</th>'; });
+  html += '</tr>';
+  DISPLAY.forEach(function (zid) {
+    var zi = ZIDX[zid];
+    html += '<tr><td style="text-align:left">' + zid + '</td>';
+    var arr = counts.map(function (c) { return c[zi]; });
+    var mn = Math.min.apply(null, arr), mx = Math.max.apply(null, arr), avg = arr.reduce(function (a, b) { return a + b; }, 0) / arr.length;
+    var spread = avg > 0 ? (mx - mn) / avg : 0;
+    arr.forEach(function (v) {
+      var cls = (spread > 0.45 && avg >= 30) ? ' class="warnspot"' : '';
+      html += '<td' + cls + '>' + v + '</td>';
+    });
+    html += '<td' + (spread > 0.45 && avg >= 30 ? ' class="warnspot"' : '') + '>' + Math.round(spread * 100) + '%</td></tr>';
+  });
+  html += '</table>';
+  host.innerHTML = html;
+}
+function shortKey(f) { var k = f.key; if (k === null) k = '·'; else if (/^[ESWN]\d$/.test(k) === false && k !== '0') k = 'k' + (parseInt(k, 10) - 1); return k; }
+
+/* ---------- инструменты ---------- */
+function paintDot(x, y, erase) {
+  var w = cur.w, r = radius - 1;
+  for (var dy = -r; dy <= r; dy++) for (var dx = -r; dx <= r; dx++) {
+    if (radius > 1 && dx * dx + dy * dy > r * r + r * .6) continue;
+    var px = x + dx, py = y + dy;
+    if (px < 0 || py < 0 || px >= w || py >= cur.h) continue;
+    var i = py * w + px;
+    if (!cur.sil[i]) continue;
+    if (erase) { cur.own[i] = (cur.own[i] === BODY_ID) ? -1 : BODY_ID; }
+    else cur.own[i] = target;
+  }
+}
+function floodAt(x, y, erase) {
+  var w = cur.w, h = cur.h, i0 = y * w + x;
+  if (!cur.sil[i0]) return;
+  var from = cur.own[i0], to = erase ? (from === BODY_ID ? -1 : BODY_ID) : target;
+  if (from === to) return;
+  var stack = [i0], seen = new Uint8Array(w * h);
+  seen[i0] = 1;
+  while (stack.length) {
+    var i = stack.pop();
+    cur.own[i] = to;
+    var nb = [i - 1, i + 1, i - w, i + w];
+    for (var k = 0; k < 4; k++) {
+      var n = nb[k];
+      if (n < 0 || n >= w * h || seen[n] || !cur.sil[n]) continue;
+      if ((n === i - 1 && i % w === 0) || (n === i + 1 && n % w === 0)) continue;
+      if (cur.own[n] !== from) continue;
+      seen[n] = 1; stack.push(n);
+    }
+  }
+}
+function pickAt(x, y) {
+  var i = y * cur.w + x;
+  var o = cur.own[i];
+  if (o >= 0) { target = o; zoneRows(); }
+}
+
+/* ---------- события канвы ---------- */
+var mdown = false, lastPt = null, dirtyStroke = false;
+function evPt(ev) {
+  var r = cv.getBoundingClientRect();
+  var x = Math.floor((ev.clientX - r.left) / zoom), y = Math.floor((ev.clientY - r.top) / zoom);
+  if (x < 0) x = 0; if (y < 0) y = 0;
+  if (x >= cur.w) x = cur.w - 1; if (y >= cur.h) y = cur.h - 1;
+  return [x, y];
+}
+function strokeLine(x0, y0, x1, y1, erase) {
+  var dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx - dy;
+  while (true) {
+    paintDot(x0, y0, erase);
+    if (x0 === x1 && y0 === y1) break;
+    var e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx) { err += dx; y0 += sy; }
+  }
+}
+cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+cv.addEventListener('mousedown', function (ev) {
+  if (!cur) return;
+  ev.preventDefault();
+  var p = evPt(ev);
+  var erase = (ev.button === 2) || (tool === 'erase');
+  mdown = true; dirtyStroke = false;
+  strokeSnap = cur.own.slice();
+  if (ev.altKey) { pickAt(p[0], p[1]); mdown = false; afterEdit(); return; }
+  if (tool === 'fill') { floodAt(p[0], p[1], erase); afterEdit(); return; }
+  if (tool === 'pick') { pickAt(p[0], p[1]); mdown = false; return; }
+  paintDot(p[0], p[1], erase); lastPt = p; dirtyStroke = true;
+  render(); updateQC(); zoneRows();
+});
+cv.addEventListener('mousemove', function (ev) {
+  if (!cur) return;
+  var p = evPt(ev);
+  drawCursor(p[0], p[1]);
+  if (!mdown) return;
+  var erase = (ev.buttons & 2) || (tool === 'erase');
+  if (lastPt) { strokeLine(lastPt[0], lastPt[1], p[0], p[1], erase); dirtyStroke = true; }
+  else paintDot(p[0], p[1], erase);
+  lastPt = p;
+  render(); computeQC();
+});
+['mouseup', 'mouseleave'].forEach(function (n) {
+  cv.addEventListener(n, function () { if (mdown) { mdown = false; lastPt = null; if (dirtyStroke) afterEdit(); } lastPt = null; });
+});
+cv.addEventListener('wheel', function (ev) {
+  if (!cur) return;
+  var zs = [2, 3, 4, 6, 8], z = Math.round(zoom);
+  var i = zs.indexOf(z); if (i < 0) i = 2;
+  i += (ev.deltaY < 0 ? 1 : -1);
+  if (i < 0) i = 0; if (i >= zs.length) i = zs.length - 1;
+  zoom = zs[i]; $('zoom').value = String(zoom); render(); drawCursorLast();
+});
+function drawCursorLast() { if (cur && lastMouse) drawCursor(lastMouse[0], lastMouse[1]); }
+var lastMouse = null;
+cv.addEventListener('mouseover', function (ev) { if (cur) { var p = evPt(ev); lastMouse = p; drawCursor(p[0], p[1]); } });
+
+/* ---------- фиксация правки ---------- */
+function holesFromOwn(own) { var hs = []; for (var i = 0; i < own.length; i++) if (own[i] === -1) hs.push(i); return hs; }
+function afterEdit() {
+  if (!cur) return;
+  var e = cur.entry;
+  var layers = zonesLayersFromOwn(cur.own, cur.w, cur.h);
+  var holes = holesFromOwn(cur.own);
+  var editsPx = 0; for (var i = 0; i < cur.own.length; i++) if (cur.own[i] !== cur.base[i]) editsPx++;
+  var id = entryId(BUILD, e);
+  if (editsPx === 0) {
+    delete EDITS[id]; strokeSnap = null;
+    render(); updateQC(); zoneRows(); editsBox(); buildFrameSelect(); stability(); saveLS();
+    return;
+  }
+  EDITS[id] = {
+    build: BUILD, file: e.file, label: e.label, group: e.group, key: e.key,
+    w: cur.w, h: cur.h, layers: layers, holes: holes, editsPx: editsPx, t: new Date().toISOString()
+  };
+  undoStack.push(strokeSnap); strokeSnap = null;
+  if (undoStack.length > 120) undoStack.shift();
+  redoStack = [];
+  render(); updateQC(); zoneRows(); editsBox(); buildFrameSelect(); stability(); saveLS();
+}
+function editsBox() {
+  var host = $('editsbox');
+  var keys = Object.keys(EDITS);
+  if (!keys.length) { host.textContent = '— правок нет —'; return; }
+  var total = 0; keys.forEach(function (k) { total += EDITS[k].editsPx; });
+  var html = keys.length + ' кадр(ов), ' + total + ' px:<br>';
+  keys.sort();
+  keys.forEach(function (k) {
+    var r = EDITS[k];
+    html += k + ' — ' + r.editsPx + 'px' + (r.key === null ? ' (новая разметка)' : '') + '<br>';
+  });
+  host.innerHTML = html;
+}
+function saveLS() {
+  try {
+    var slim = {};
+    Object.keys(EDITS).forEach(function (k) { var r = EDITS[k]; slim[k] = { build: r.build, file: r.file, label: r.label, group: r.group, key: r.key, w: r.w, h: r.h, layers: r.layers, editsPx: r.editsPx, t: r.t }; });
+    localStorage.setItem(LS_KEY, JSON.stringify(slim));
+  } catch (err) { ERR.push('saveLS: ' + err); }
+}
+function loadLS() {
+  try {
+    var raw = localStorage.getItem(LS_KEY);
+    if (!raw) return 0;
+    var o = JSON.parse(raw), n = 0;
+    Object.keys(o).forEach(function (k) {
+      var r = o[k];
+      if (r && r.layers && r.build && D.builds[r.build]) {
+        var ok = D.builds[r.build].some(function (f) { return f.file === r.file; });
+        if (ok) { EDITS[k] = r; n++; }
+      }
+    });
+    return n;
+  } catch (err) { ERR.push('loadLS: ' + err); return 0; }
+}
+
+/* ---------- undo / redo / сброс ---------- */
+function doUndo() { if (!cur) return; if (!undoStack.length) { return; } redoStack.push(cur.own.slice()); cur.own.set(undoStack.pop()); syncAfterHistory(); }
+function doRedo() { if (!cur) return; if (!redoStack.length) return; undoStack.push(cur.own.slice()); cur.own.set(redoStack.pop()); syncAfterHistory(); }
+function syncAfterHistory() {
+  var e = cur.entry, layers = zonesLayersFromOwn(cur.own, cur.w, cur.h), holes = holesFromOwn(cur.own);
+  var px = 0; for (var i = 0; i < cur.own.length; i++) if (cur.own[i] !== cur.base[i]) px++;
+  var id = entryId(BUILD, e);
+  if (px === 0) { delete EDITS[id]; }
+  else { EDITS[id] = { build: BUILD, file: e.file, label: e.label, group: e.group, key: e.key, w: cur.w, h: cur.h, layers: layers, holes: holes, editsPx: px, t: new Date().toISOString() }; }
+  render(); updateQC(); zoneRows(); editsBox(); buildFrameSelect(); stability(); saveLS();
+}
+
+/* ---------- экспорт ---------- */
+function canonLayersFor(build, e) {
+  var rec = EDITS[entryId(build, e)];
+  if (rec && rec.layers) return rec.layers;
+  if (EXT[build] && EXT[build][e.key]) return EXT[build][e.key];
+  return D.masks[build][e.key] || null;
+}
+function baselineLayersFor(build, e) {           /* канон БЕЗ правок сессии — для diffVsBase */
+  if (EXT[build] && EXT[build][e.key]) return EXT[build][e.key];
+  return D.masks[build][e.key] || null;
+}
+function exportCanonical() {
+  var out = {}, n = 0;
+  D.builds[BUILD].forEach(function (e) {
+    if (e.key === null) return;
+    var L = canonLayersFor(BUILD, e);
+    if (!L) return;
+    out[e.key] = {}; ZONES.forEach(function (z) { out[e.key][z.id] = L[z.id] || []; });
+    n++;
+  });
+  return JSON.stringify(out);
+}
+function qcForExport(layers, w, h, sil) {
+  var listed = 0, outside = 0, nIn = 0, seenIn = new Set();
+  ZONES.forEach(function (z) {
+    (layers[z.id] || []).forEach(function (px) {
+      listed++;
+      if (px < 0 || px >= w * h || !sil[px]) { outside++; return; }
+      nIn++; seenIn.add(px);
+    });
+  });
+  var holes = 0;
+  for (var i = 0; i < sil.length; i++) if (sil[i] && !seenIn.has(i)) holes++;
+  return { unionPx: seenIn.size, silPx: countNZ(sil), holes: holes, outside: outside, inter: Math.max(0, nIn - seenIn.size) };
+}
+function countNZ(u8) { var n = 0; for (var i = 0; i < u8.length; i++) if (u8[i]) n++; return n; }
+function overlayPng(layers, w, h, img) {
+  var c = document.createElement('canvas'); c.width = w; c.height = h;
+  var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  var im = x.getImageData(0, 0, w, h), d = im.data;
+  for (var zid in layers) {
+    var p = PALETTE[zid], arr = layers[zid];
+    for (var i = 0; i < arr.length; i++) {
+      var px = arr[i]; if (px < 0 || px >= w * h) continue;
+      d[px * 4] = p[1]; d[px * 4 + 1] = p[2]; d[px * 4 + 2] = p[3]; d[px * 4 + 3] = Math.max(160, d[px * 4 + 3]);
+    }
+  }
+  x.putImageData(im, 0, 0);
+  return c.toDataURL('image/png');
+}
+function exportPackage() {
+  var frames = [];
+  Object.keys(EDITS).sort().forEach(function (k) {
+    var r = EDITS[k];
+    var img = IMGS[r.file]; if (!img) { ERR.push('exportPackage: нет кадра ' + r.file); return; }
+    var bEntry = D.builds[r.build].filter(function (f) { return f.file === r.file; })[0];
+    if (!bEntry) { ERR.push('exportPackage: кадр не в каталоге ' + r.file); return; }
+    var sil = silhouetteOf(img, r.w, r.h);
+    var q = qcForExport(r.layers, r.w, r.h, sil);
+    var dif = {};
+    ZONES.forEach(function (z) {
+      var a = (r.layers[z.id] || []).length;
+      var src = baselineLayersFor(r.build, bEntry);
+      var b = src ? (src[z.id] || []).length : 0;
+      if (a !== b) dif[z.id] = a - b;
+    });
+    frames.push({
+      build: r.build, frameKey: k, file: r.file, label: r.label, group: r.group, canonKey: r.key,
+      w: r.w, h: r.h, zones: r.layers, qc: q, editsPx: r.editsPx, diffVsBase: dif,
+      baseline: (EXT[r.build] && EXT[r.build][r.key]) ? 'external' : 'embedded',
+      png: overlayPng(r.layers, r.w, r.h, img), savedAt: r.t
+    });
+  });
+  return JSON.stringify({
+    format: 'kns-mask-annotator-patch', version: 1,
+    generator: 'mask-annotator.html v1 (kns)', created: new Date().toISOString(),
+    zones: D.zones.map(function (z) { return z.id; }),
+    zonePriority: D.zonePriority,
+    frames: frames
+  });
+}
+function download(name, content, mime) {
+  var b = new Blob([content], { type: mime || 'application/octet-stream' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+}
+
+/* ---------- загрузка внешних масок ---------- */
+function applyExternalMasks(build, obj) {
+  var applied = [], ignored = [];
+  D.builds[build].forEach(function (e) {
+    if (e.key === null) return;
+    if (obj[e.key]) {
+      var L = {}; ZONES.forEach(function (z) { L[z.id] = (obj[e.key][z.id] || []).map(Number).filter(isFinite); });
+      if (!EXT[build]) EXT[build] = {};
+      EXT[build][e.key] = L;
+      delete EDITS[entryId(build, e)];   // правки по старому канону сбрасываем
+      applied.push(e.key);
+    } else ignored.push(e.key);
+  });
+  EXTAPPLIED[build] = applied.slice();
+  var note = $('extnote');
+  note.style.display = 'block';
+  note.innerHTML = 'Подхвачены свежие маски, ключи: ' + (applied.join(', ') || '—') + (ignored.length ? '. Не найдены: ' + ignored.join(', ') : '') +
+    '. Правки этих кадров сброшены, сравнение теперь — против внешнего файла.';
+  if (cur && cur.entry.key !== null && applied.indexOf(cur.entry.key) >= 0) loadEntry(frameIdx);
+  else { render(); updateQC(); }
+  buildFrameSelect(); editsBox(); saveLS();
+  return applied;
+}
+
+/* ---------- сборка select / события ---------- */
+$('build').addEventListener('change', function () { BUILD = this.value; frameIdx = 0; buildFrameSelect(); loadEntry(0); });
+$('frame').addEventListener('change', function () { loadEntry(parseInt(this.value, 10) || 0); });
+$('zoom').addEventListener('change', function () { zoom = parseInt(this.value, 10) || 4; render(); });
+$('grid').addEventListener('change', function () { showGrid = this.checked; render(); });
+$('hideall').addEventListener('change', function () { hideAll = this.checked; render(); });
+$('radius').addEventListener('input', function () { radius = parseInt(this.value, 10) || 1; $('radiusv').textContent = String(radius); });
+[['tool-brush', 'brush'], ['tool-fill', 'fill'], ['tool-erase', 'erase'], ['tool-pick', 'pick']].forEach(function (pair) {
+  $(pair[0]).addEventListener('click', function () { tool = pair[1]; toolUI(); });
+});
+function toolUI() {
+  ['tool-brush', 'tool-fill', 'tool-erase', 'tool-pick'].forEach(function (id, i) { $(id).classList.toggle('on', ['brush', 'fill', 'erase', 'pick'][i] === tool); });
+  $('radius').disabled = (tool === 'pick');
+  cv.style.cursor = tool === 'erase' ? 'cell' : 'crosshair';
+}
+document.addEventListener('keydown', function (ev) {
+  if (ev.target && /input|select|textarea/i.test(ev.target.tagName)) return;
+  if (ev.ctrlKey || ev.metaKey) {
+    if (ev.key === 'z' && !ev.shiftKey) { ev.preventDefault(); doUndo(); }
+    if ((ev.key === 'Z' || (ev.key === 'z' && ev.shiftKey))) { ev.preventDefault(); doRedo(); }
+    return;
+  }
+  var m = { b: 'brush', f: 'fill', e: 'erase', p: 'pick' }[ev.key.toLowerCase()];
+  if (m) { tool = m; toolUI(); }
+});
+$('undo').addEventListener('click', doUndo);
+$('redo').addEventListener('click', doRedo);
+$('resetcur').addEventListener('click', function () {
+  if (!cur) return;
+  delete EDITS[entryId(BUILD, cur.entry)];
+  loadEntry(frameIdx); editsBox(); buildFrameSelect(); saveLS();
+});
+$('resetall').addEventListener('click', function () {
+  if (!confirm('Сбросить ВСЕ правки во всех кадрах?')) return;
+  EDITS = {};
+  try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  $('extnote').style.display = 'none';
+  loadEntry(frameIdx); editsBox(); buildFrameSelect();
+});
+$('dlcanon').addEventListener('click', function () {
+  download('kns_masks_' + BUILD + '_annotated.json', exportCanonical(), 'application/json');
+});
+$('dlpack').addEventListener('click', function () {
+  var keys = Object.keys(EDITS).length;
+  if (!keys) { alert('Правок пока нет — рисуй кистью, они появятся здесь.'); return; }
+  download('kns_mask_patch_' + BUILD + '.json', exportPackage(), 'application/json');
+});
+$('loadmasks').addEventListener('change', function () {
+  var f = this.files && this.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () {
+    try {
+      var obj = JSON.parse(rd.result);
+      if (obj && obj.frames && obj.format === 'kns-mask-annotator-patch') { alert('Это пакет правок, а не канон-маски. Примени его ИИ-конвейером (apply_mask_patch.py), а не сюда.'); return; }
+      applyExternalMasks(BUILD, obj);
+    } catch (e) { alert('Не получилось разобрать JSON: ' + e); }
+  };
+  rd.readAsText(f);
+  this.value = '';
+});
+
+/* ---------- прекеш кадров каталога ---------- */
+function preloadAll(cb) {
+  var files = [], seen = {};
+  Object.keys(D.builds).forEach(function (b) { D.builds[b].forEach(function (e) { if (!seen[e.file]) { seen[e.file] = 1; files.push(e.file); } }); });
+  var left = files.length;
+  files.forEach(function (f) {
+    var im = new Image();
+    im.onload = function () { IMGS[f] = im; if (--left === 0) cb(); };
+    im.onerror = function () { ERR.push('img fail: ' + f); IMGS[f] = null; if (--left === 0) cb(); };
+    im.src = f;
+  });
+}
+
+/* ---------- зонд для приёмки (браузерный smoke) ---------- */
+window.__annotator = {
+  ready: false, ver: '1.0',
+  errors: function () { return ERR.slice(); },
+  entries: function () { return D.builds[BUILD].map(function (e, i) { return { i: i, key: e.key, file: e.file, label: e.label, group: e.group, edits: !!EDITS[entryId(BUILD, e)] }; }); },
+  state: function () {
+    if (!cur) return null;
+    return { build: BUILD, idx: frameIdx, file: cur.entry.file, key: cur.entry.key, w: cur.w, h: cur.h, tool: tool, target: ZONES[target].id, radius: radius, zoom: zoom, edits: Object.keys(EDITS).map(function (k) { return k; }), editsPx: qcCache.editsPx, extUsed: cur.extUsed };
+  },
+  qc: function () {
+    if (!cur) return null;
+    computeQC();
+    var sil = countNZ(cur.sil);
+    var union = 0; for (var i = 0; i < cur.own.length; i++) if (cur.own[i] >= 0) union++;
+    return { union: union, sil: sil, holes: qcCache.holes, outside: cur.outside0, inter: cur.inter0, editsPx: qcCache.editsPx, counts: qcCache.counts.slice() };
+  },
+  setBuild: function (b) { if (!D.builds[b]) throw new Error('нет билда ' + b); BUILD = b; frameIdx = 0; buildFrameSelect(); loadEntry(0); return this.state(); },
+  setFrame: function (i) { var n = parseInt(i, 10); if (!(n >= 0 && n < D.builds[BUILD].length)) throw new Error('нет кадра ' + i); loadEntry(n); return this.state(); },
+  findFrame: function (fileOrKey) {
+    var r = -1; D.builds[BUILD].forEach(function (e, i) { if (e.file === fileOrKey || e.key === fileOrKey) { if (r < 0) r = i; } });
+    if (r < 0) throw new Error('кадр не найден: ' + fileOrKey);
+    return r;
+  },
+  setTool: function (t) { if (['brush', 'fill', 'erase', 'pick'].indexOf(t) < 0) throw new Error('нет инструмента ' + t); tool = t; toolUI(); return t; },
+  setZone: function (zid) { if (!(zid in ZIDX)) throw new Error('нет зоны ' + zid); target = ZIDX[zid]; zoneRows(); return zid; },
+  setRadius: function (r) { radius = Math.max(1, Math.min(4, parseInt(r, 10) || 1)); $('radius').value = String(radius); $('radiusv').textContent = String(radius); return radius; },
+  setZoom: function (z) { zoom = parseInt(z, 10) || 4; $('zoom').value = String(zoom); render(); return zoom; },
+  paintAt: function (x, y, opt) {
+    if (!cur) throw new Error('кадр не загружен');
+    strokeSnap = cur.own.slice();
+    var erase = opt && (opt.erase || opt.eraser);
+    if (opt && opt.stroke) { var prev = null; for (var i = 0; i < opt.stroke.length; i += 2) { var px = opt.stroke[i], py = opt.stroke[i + 1]; if (prev) strokeLine(prev[0], prev[1], px, py, erase); else paintDot(px, py, erase); prev = [px, py]; } dirtyStroke = true; }
+    else if (opt && opt.flood) { floodAt(x, y, erase); }
+    else { paintDot(x, y, erase); dirtyStroke = true; }
+    afterEdit(); return this.qc();
+  },
+  eraseAt: function (x, y) { strokeSnap = cur.own.slice(); paintDot(x, y, true); dirtyStroke = true; afterEdit(); return this.qc(); },
+  undo: doUndo, redo: doRedo,
+  pixelZone: function (x, y) { if (!cur) throw new Error('кадр не загружен'); return cur.own[y * cur.w + x]; },
+  zoneName: function (i) { return i >= 0 ? ZONES[i].id : (i === -1 ? 'hole' : 'out'); },
+  findPixel: function (zid) { var zi = ZIDX[zid]; for (var i = 0; i < cur.own.length; i++) if (cur.own[i] === zi) return [i % cur.w, (i / cur.w) | 0]; return null; },
+  loadMasks: function (obj) { return applyExternalMasks(BUILD, obj); },
+  exportCanonical: exportCanonical, exportPackage: exportPackage,
+  reloadFrame: function () { loadEntry(frameIdx); return this.state(); },
+  editsList: function () { return Object.keys(EDITS).sort().map(function (k) { return { k: k, px: EDITS[k].editsPx, key: EDITS[k].key, file: EDITS[k].file }; }); }
+};
+
+/* ---------- старт ---------- */
+buildBuildSelect(); buildFrameSelect(); zoneRows(); toolUI();
+preloadAll(function () {
+  var n = loadLS();
+  window.__annotator.ready = true;
+  loadEntry(0, function () {
+    if (n > 0) {
+      $('restore-bar').style.display = 'block';
+      $('restore-txt').textContent = 'Восстановлено правок: ' + n + ' кадр(ов) из прошлого сеанса.';
+      $('restore-drop').onclick = function () { EDITS = {}; try { localStorage.removeItem(LS_KEY); } catch (e) {} $('restore-bar').style.display = 'none'; loadEntry(frameIdx); editsBox(); buildFrameSelect(); };
+      $('restore-keep').onclick = function () { $('restore-bar').style.display = 'none'; };
+    }
+    editsBox(); buildFrameSelect();
+  });
+});
+</script>
+</body></html>
