@@ -1,0 +1,41 @@
+name: main-guard
+
+# Сторож main (Free-план: серверной блокировки приватного репо нет).
+# На каждый push в main:
+#   - merge-коммиты PR — ок;
+#   - прямой пуш мимо PR — авто-реверт (fast-forward поверх нарушителя,
+#     дерево родителя) + alarm-issue. Деплой нарушителя стопит отдельный
+#     гейт внутри deploy.yml — на прод контент не попадает.
+# Чекаут берётся из ДО-состояния (event.before): подмена/удаление
+# tools/main_guard.py нарушителем не ломает сторожа.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: main-guard
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Чекаут ДО-состояния main (иммунитет к подмене guard'а)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.before || github.sha }}
+          persist-credentials: false
+      - name: Вердикт и реверт
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.after || github.sha }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: python3 tools/main_guard.py revert "$SHA"

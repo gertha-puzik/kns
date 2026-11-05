@@ -1,0 +1,61 @@
+name: KNS QC
+
+# Бот-гейт PR (создан 2026-11-05, регламент досье §8.7):
+# каждый PR автоматически проверяется структурным QC до мерджа в main
+# (main = деплой-триггер). Зелёный «KNS QC / qc» = можно мержить,
+# красный = мердж заблокирован, лог падает комментарием в PR.
+# Пиксельные A/B и браузерные зонды — вне гейта, их ведёт агент.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: qc-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  qc:
+    name: qc
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Чекаут
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: QC-проверки
+        run: |
+          set -o pipefail
+          python3 tools/pr_qc.py 2>&1 | tee "$RUNNER_TEMP/qc.log"
+      - name: Провал → лог в PR
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo '## ⛔ KNS QC не прошёл'
+            echo
+            echo 'Гейт перезапустится сам, когда пуш в ветку PR исправит замечания. Пиксельные A/B и браузерные зонды — по-прежнему за agentом (досье §8.7).'
+            echo
+            echo '<details><summary>Лог QC (последние 80 строк)</summary>'
+            echo
+            echo '````'
+            tail -n 80 "$RUNNER_TEMP/qc.log" || true
+            echo '````'
+            echo
+            echo '</details>'
+          } > "$RUNNER_TEMP/comment.md"
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --body-file "$RUNNER_TEMP/comment.md"
+          fi
+          cat "$RUNNER_TEMP/comment.md"
