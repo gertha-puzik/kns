@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>Конструктор окрасов — прототип coop-field (референс CatWar)</title>
 <script src="catwar-manifest.js"></script>
+<script src="tint.js"></script>
 <style>
   /* ретро-стиль в духе оригинального CatWar kns.php */
   * { box-sizing: border-box; }
@@ -97,6 +98,7 @@
     <div class="row" id="model-build"></div>
     <div class="row" style="margin-bottom:1px">Хвост:</div>
     <div class="row" id="model-tail"></div>
+    <div class="note" id="model-tint-note"></div>
     <div class="note">Модель справа всегда показывает обе позы: идёт (280 мс/кадр) и сидит-калачик. «Хвост» действует только на ходьбу (ситы с хвостом-вниз не заказаны), телосложение — на обе. Поза «сидит/ходит» — настройка окраса-кота слева. Импорт кода из CatWar сбрасывает телосложение и хвост в дефолт: среднее + вверх (родная M2).</div>
   </div>
 
@@ -111,6 +113,9 @@
 
 <script>
 'use strict';
+// коллектор скрытых ошибок приёмки: любой runtime-сбой остаётся видимым для зонда (window.__knsErr)
+window.__knsErr = [];
+window.addEventListener('error', function (e) { __knsErr.push((e.message || 'error') + ' @ ' + (e.filename || '') + ':' + e.lineno); });
 const M = CATWAR_MANIFEST;
 const W = 100, H = 150;
 const cv = document.getElementById('main');
@@ -293,7 +298,10 @@ function render() {
     note.style.display = 'block';
     note.textContent = 'Пропущено слоёв: ' + missing + ' — нет файлов в арт-паке (гейты CatWar: усы 22, нос 23 — файлы не отдаются; либо арт ещё не сгенерирован).';
   } else { note.style.display = 'none'; note.textContent = ''; }
-  updateCodeBox();
+  const sig = updateCodeBox();
+  // этап 10: смена окраса → пара моделей M2 перекрашивается тонировкой; на тиках walk
+  // сигнатура та же — лишних repaint нет (render() вызывается каждые 40 мс)
+  if (sig !== modelCoatSig) { modelCoatSig = sig; renderModel(); renderModelSit(); }
 }
 
 // ---------- walk-анимация ----------
@@ -371,6 +379,35 @@ const MODEL_FRAMES_WALK = {
   }
 };
 const MODEL_FRAMES_SIT = { norm: 'model/sit_norm.png', thin: 'model/sit_thin.png', chub: 'model/sit_chub.png' };
+// ---------- послойная тонировка модели (этап 10): движок tint.js на серых масках gray/ ----------
+// Зоны маски ← слоты кода окраса: тело/голова/лапы/грудка/живот ← «Основа» (слот 0),
+// хвост ← «Хвост-основа» (15), уши ← «Уши-основа» (17); глаза/нос/раковины — protect, без тонировки.
+// У каждого билда маски запечены в родной паре с хвостом (norm/chub — вверх, thin — вниз);
+// пары norm+down / thin+up / chub+down рендерятся прежним статичным артом model/ (без тонировки).
+const MODEL_WALK_KEYS = ['1', '2', '3', '4']; // tint-ключи E-ходьбы — родное направление модельки
+const TINT_NATIVE_TAIL = { norm: 'up', thin: 'down', chub: 'up' };
+let tintReady = false;        // Tint.init() прошёл (gray/tint_meta.json загружен)
+let modelMode = 'static', modelSitMode = 'static';
+let modelCoatSig = null;      // сигнатура окраса (код) — repaint модели только при смене
+const tintLoading = {};
+function modelTintable() { return tintReady && typeof Tint !== 'undefined' && modelOpts.tail === TINT_NATIVE_TAIL[modelOpts.build]; }
+function tintEnsure(build, keys) { // доливить маски кадра: репейнт пары по готовности
+  if (!tintReady) return;
+  for (const k of keys) {
+    const id = build + '/' + k;
+    if (tintLoading[id]) continue;
+    tintLoading[id] = true;
+    Tint.onFrameReady(build, k).then(function () { renderModel(); renderModelSit(); })
+      .catch(function () { tintLoading[id] = 'fail'; });
+  }
+}
+function modelTintNote() { // подпись под селекторами: что сейчас красит пару
+  const el = document.getElementById('model-tint-note');
+  if (!el) return;
+  el.textContent = modelTintable()
+    ? 'Тонировка: модель красится твоим окрасом — цвет «Основы» красит тело, лапы, грудку и живот (слои по порядку блока), «Хвост-основы» — хвост, «Уши-основы» — уши. Глаза/нос у модели свои, тонировке не подчиняются.'
+    : 'Пара телосложение и хвост без серых масок: пара показана базовым артом M2 (золотистый), послойная окраска на неё пока не накладывается.';
+}
 const MODEL_BUILDS = [['norm', 'Среднее'], ['thin', 'Худой'], ['chub', 'Пухлый']];
 const MODEL_TAILS = [['up', 'Вверх'], ['down', 'Вниз']];
 let modelOpts = { build: 'norm', tail: 'up' };
@@ -395,11 +432,27 @@ function modelFile() {
 }
 function renderModel() {
   mctx.clearRect(0, 0, W, H);
+  if (modelTintable()) {
+    if (Tint.render(mcv, { build: modelOpts.build, key: MODEL_WALK_KEYS[modelFrame % 4], state: state })) {
+      modelMode = 'tint'; modelTintNote();
+      return;
+    }
+    tintEnsure(modelOpts.build, MODEL_WALK_KEYS); // маски в полёте — пока статик, до onload
+  }
+  modelMode = 'static'; modelTintNote();
   const im = modelImg(modelFile());
   if (im && im.complete && im.naturalWidth > 0) mctx.drawImage(im, 0, 0);
 }
 function renderModelSit() { // правая клетка пары — всегда сид-калачик
   msctx.clearRect(0, 0, W, H);
+  if (modelTintable()) { // сид красится только когда красится и ходьба — пара согласована
+    if (Tint.render(mscv, { build: modelOpts.build, key: '0', state: state })) {
+      modelSitMode = 'tint';
+      return;
+    }
+    tintEnsure(modelOpts.build, ['0']);
+  }
+  modelSitMode = 'static';
   const im = modelImg(MODEL_FRAMES_SIT[modelOpts.build]);
   if (im && im.complete && im.naturalWidth > 0) msctx.drawImage(im, 0, 0);
 }
@@ -437,8 +490,13 @@ window.__knsModel = {
   get opts() { return Object.assign({}, modelOpts); },
   get frame() { return modelFrame; },
   get sitFile() { return MODEL_FRAMES_SIT[modelOpts.build]; },
+  get mode() { return modelMode; },       // 'tint' — модель красится окрасом | 'static' — базовый арт M2
+  get sitMode() { return modelSitMode; },
+  get tintReady() { return tintReady; },  // движок tint.js инициализирован
+  get coatSig() { return modelCoatSig; }, // сигнатура окраса, которой покрашена пара
   setFrame(k) { modelFrame = k; renderModel(); },
-  force(b, t) { if (b) modelOpts.build = b; if (t) modelOpts.tail = t; renderModel(); renderModelSit(); }
+  force(b, t) { if (b) modelOpts.build = b; if (t) modelOpts.tail = t; renderModel(); renderModelSit(); },
+  setCoat(next) { state = next; persist(); render(); } // зонд-хелпер: подменить окрас целиком (persist — как клики UI)
 };
 
 // ---------- категории (как в KNS: Основа / Шея и морда / Туловище / Лапы и хвост) ----------
@@ -713,7 +771,7 @@ function randomize() {
   state = next; layerSel = {}; persist(); render(); buildCategories(); buildSlotPanel();
 }
 function resetAll() { state = DEFAULT_STATE(); persist(); resetModelOpts(); render(); renderModel(); buildCategories(); buildSlotPanel(); }
-function updateCodeBox() { document.getElementById('code-out').value = encodeCode(); }
+function updateCodeBox() { const s = encodeCode(); document.getElementById('code-out').value = s; return s; }
 
 document.getElementById('btn-walk').onclick = () => setPose('walk');
 document.getElementById('btn-sit').onclick = () => setPose('sit');
@@ -753,6 +811,21 @@ renderModel();
 renderModelSit();
 if (pose === 'walk') startAnim();
 startModelAnim(); // модель: ходьба анимируется всегда, независимо от позы окраса-кота
+// этап 10: инициализация движка тонировки; по готовности мета — прогрев масок текущего билда
+// (сид + 4 фазы ходьбы) и перекраска пары. Файл движка не загрузился → страница живёт
+// на статичном арте (tintReady=false), ошибка остаётся видимой через __knsErr.
+if (typeof Tint === 'undefined') {
+  __knsErr.push('tint.js не загрузился — модель на статичном арте');
+} else {
+  Tint.init().then(function () {
+    tintReady = true;
+    tintEnsure(modelOpts.build, ['0'].concat(MODEL_WALK_KEYS));
+    renderModel(); renderModelSit();
+  }).catch(function (e) {
+    tintReady = false;
+    __knsErr.push('Tint.init: ' + ((e && e.message) || e));
+  });
+}
 </script>
 </body>
 </html>
