@@ -9,8 +9,10 @@
   "earR": 17,
   "body": 0,
   "head": 0,
-  "fore": 0,
-  "hind": 0,
+  "foreL": 0,
+  "foreR": 0,
+  "hindL": 0,
+  "hindR": 0,
   "chest": 0,
   "belly": 0
  },
@@ -18,7 +20,7 @@
   "norm": {
    "label": "Среднее",
    "walkTail": "up",
-   "K": 1.2512,
+   "K": 1.2492,
    "keys": [
     "1",
     "2",
@@ -38,7 +40,7 @@
   "thin": {
    "label": "Худой",
    "walkTail": "down",
-   "K": 1.2916,
+   "K": 1.2905,
    "keys": [
     "1",
     "2",
@@ -58,7 +60,7 @@
   "chub": {
    "label": "Пухлый",
    "walkTail": "up",
-   "K": 1.2709,
+   "K": 1.2699,
    "keys": [
     "1",
     "2",
