@@ -99,15 +99,15 @@
 
     <div class="lbl">Свои картинки</div>
     <div class="row" id="customs">
-      <span class="slot"><span class="slotrow"><input id="f-disc" type="file" accept="image/*" hidden data-k="disc"><label id="lbl-disc" for="f-disc" title="Большой круг время суток">Круг</label><button class="clr" data-k="disc" title="Вернуть рисованный">✕</button></span>
+      <span class="slot"><span class="slotrow"><input id="f-disc" type="file" accept="image/*" hidden data-k="disc"><label id="lbl-disc" for="f-disc" title="Большой круг время суток">Круг</label><button class="clr" data-k="disc" title="Вернуть исходный">✕</button></span>
         <span class="dim">рек. 512×512 px, PNG (квадрат)</span></span>
-      <span class="slot"><span class="slotrow"><input id="f-needle" type="file" accept="image/*" hidden data-k="needle"><label id="lbl-needle" for="f-needle" title="Звезда-игла слева от круга">Стрелочка</label><button class="clr" data-k="needle" title="Вернуть рисованный">✕</button></span>
+      <span class="slot"><span class="slotrow"><input id="f-needle" type="file" accept="image/*" hidden data-k="needle"><label id="lbl-needle" for="f-needle" title="Звезда-игла слева от круга">Стрелочка</label><button class="clr" data-k="needle" title="Вернуть исходный">✕</button></span>
         <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
-      <span class="slot"><span class="slotrow"><input id="f-sun" type="file" accept="image/*" hidden data-k="sun"><label id="lbl-sun" for="f-sun" title="Иконка «Солнечно»">Солнечно</label><button class="clr" data-k="sun" title="Вернуть рисованный">✕</button></span>
+      <span class="slot"><span class="slotrow"><input id="f-sun" type="file" accept="image/*" hidden data-k="sun"><label id="lbl-sun" for="f-sun" title="Иконка «Солнечно»">Солнечно</label><button class="clr" data-k="sun" title="Вернуть исходный">✕</button></span>
         <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
-      <span class="slot"><span class="slotrow"><input id="f-cloud" type="file" accept="image/*" hidden data-k="cloud"><label id="lbl-cloud" for="f-cloud" title="Иконка «Пасмурно»">Пасмурно</label><button class="clr" data-k="cloud" title="Вернуть рисованный">✕</button></span>
+      <span class="slot"><span class="slotrow"><input id="f-cloud" type="file" accept="image/*" hidden data-k="cloud"><label id="lbl-cloud" for="f-cloud" title="Иконка «Пасмурно»">Пасмурно</label><button class="clr" data-k="cloud" title="Вернуть исходный">✕</button></span>
         <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
-      <span class="slot"><span class="slotrow"><input id="f-rain" type="file" accept="image/*" hidden data-k="rain"><label id="lbl-rain" for="f-rain" title="Иконка «Дождь»">Дождь</label><button class="clr" data-k="rain" title="Вернуть рисованный">✕</button></span>
+      <span class="slot"><span class="slotrow"><input id="f-rain" type="file" accept="image/*" hidden data-k="rain"><label id="lbl-rain" for="f-rain" title="Иконка «Дождь»">Дождь</label><button class="clr" data-k="rain" title="Вернуть исходный">✕</button></span>
         <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
     </div>
 
@@ -124,7 +124,7 @@
       <span id="snapnote" class="custom-hint">подставь свои картинки, скачай кадр и кинь картинкой в чат — так предложишь свой вариант</span>
     </div>
 
-    <div class="custom-hint">Загрузки хранятся в этом браузере (localStorage) и остаются после перезагрузки; ✕ — вернуть рисованный вариант.</div>
+    <div class="custom-hint">Загрузки хранятся в этом браузере (localStorage) и остаются после перезагрузки; ✕ — вернуть исходный вариант.</div>
 
   </div>
 </div>
@@ -176,6 +176,22 @@ const dayPartOf = (p4) => Math.floor(((p4 % 4) + 4) % 4);
 const CUSTOM = { disc: null, needle: null, sun: null, cloud: null, rain: null };
 const CUSTOM_LABEL = { disc: 'Круг', needle: 'Стрелочка', sun: 'Солнечно', cloud: 'Пасмурно', rain: 'Дождь' };
 const LS_KEY = 'weather-demo-custom-v1';
+
+/* Штатные (встроенные) картинки HUD 2026-11-06: пиксель-арт по выбору заказчицы.
+ * Круг — сетка 32: 4 сектора утро/день/вечер/ночь, швы-дизер (шахматное смешение
+ * соседних секторов — пиксельный «плавный переход»), спрайты: рассвет/солнце/закат/
+ * серп/звёзды. Игла — пиксельная роза по форме её arrow.png (индиго).
+ * Своя загрузка перекрывает штатную; пока картинка не загрузилась — canvas-фолбэк. */
+const DEFAULT_ART_SRC = {
+  disc: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACOklEQVR4nK1Xvy8EQRSenWycxAkJColCUNx1GlEcfwGFIKK45OQaf4JEo/YnKFxycoUIoqDVoBCN7q4QoVJQECSIOHnj3mbMvvm1e18yeW9nbuf75pu3ezuMpcDz60cTWpo5Qh8yta/zdJvtDpbJsd7uzqAtAp5bkwOZDCBebuVH9ab2PpuQwEauEqsQQh4qIlKYywdGETwpuUyoI0d3THXCdeTZzA8zAVZN5b4iwiTksvWYUyj1rEZ5tb4l5la3I/Ddc50QVYRMHol42YrVBE9K7loDtu3gLCF8asAEnsZ6Kpft1l3LLnBq8kzzwJq7OACk2HTgLCEoB4rjTdF8wKnOz2BBxEzukrH80F+U+ikHZGIfERyT4bWTfxFJEXiN47jq6b2SyO/XV1jtOogi9OM4FRGBrgBVAcKBxqT3f4EJ8E4QAnIT8943X8xmWeH4TUQVI1NPsb7b8/5YX9/GDuPwVmpcHYqOu80Z5wjkeA054GypahSN4xCBHLjFKzGJC5QDI+EXu/3uiLmAq5fHUQBnCYGrlnOY/LFYiUixRUJa5DJ4UgHyyjEH8txYVyTCBbydDgzUyqxx8y6iKwJMqDqoXyyKmC/sez0FNuD+Q651AMiBGBoKsTlggm5bOCby46hbta0GTORYG/Lq/wmgRMhOpHEAayM3Gsa+kLn6Y1cnfBwAUOSkAEoEBR8HVNutAlxEuDpgIgdYz2/46aR7VeseRyB2OZqFNgE4AXWwQFGUU66H01Rox/H8FxvufXl4MghtAAAAAElFTkSuQmCC',
+  needle: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABDElEQVR4nNVXQQrCMBDcDB68FPoKLwHPgn/wKR77CI8+xT8InoVefIXgxVtlPVlN0mQ3je1AaWmymcnsJiFEc4a1h44fzRjIJ6ewAPsxc40LoD8DkiDXjKUuIDXg/nh2kjYfTGrA0EzbtjGjOWAjbE5NBXKSS/oi94CpMQg1clFp1jjHDhUmQuTbzZG04DFCIozrp3Z/T1khpgRxSIhx2X2+7HsBvlSs1rv3+3Y9iYUs+KOulj0n6qrxBuV2yUiCtAX6k4JSIlxFCBG7I20hcE35zgiQAjEHD5OHxIJGBAsccgpjksf0g5boe89IIc8iQEOeXYDLjaIC6oSlOZnbEWjusIWOcPJBcheYFF7tk3vivyGFJgAAAABJRU5ErkJggg==',
+};
+const DEFAULT_IMG = {};
+for (const k in DEFAULT_ART_SRC) {
+  const im = new Image();
+  im.onload = () => { DEFAULT_IMG[k] = im; };
+  im.src = DEFAULT_ART_SRC[k];
+}
 
 function setCustomLabel(k, name, on) {
   const el = $('lbl-' + k);
@@ -277,7 +293,7 @@ function hudGeometry() {
   const satX = W - HUD_PAD - rs - 1;                 // малый диск не выходит за кромку окна
   const cy = HUD_PAD + R + 3;                        // общая вертикаль центров
   const cx = satX - (R + rs * (1 - HUD_SAT_OVERLAP)); // малый диск слегка наезжает на большой
-  return { R, rs, cx, cy, satX, needleX: cx - R - 3 };
+  return { R, rs, cx, cy, satX, needleX: cx - R + 2 }; // центр иглы на кромке — «заезжает» на круг
 }
 
 /** Облако-«пузырьки»: четыре круга и плоская подошва. s — масштаб, (x, y) — центр. */
@@ -344,12 +360,14 @@ function drawDisc(g, cx, cy, R, p4) {
   g.translate(cx, cy);
   g.rotate(-(p4 * 90) * HUD_DEG);
 
-  // свой круг: вписан в диаметр (cover) и вращается вместе с диском
-  const img = CUSTOM.disc;
+  // штатный/свой круг: вписан в диаметр (cover) и вращается вместе с диском
+  const img = CUSTOM.disc || DEFAULT_IMG.disc;
   if (img && img.complete && img.naturalWidth > 0) {
     const s = Math.max((2 * R) / img.naturalWidth, (2 * R) / img.naturalHeight);
+    if (img === DEFAULT_IMG.disc) g.imageSmoothingEnabled = false; // штатный пиксель-арт — чёткие пиксели
     g.drawImage(img, -img.naturalWidth * s / 2, -img.naturalHeight * s / 2,
       img.naturalWidth * s, img.naturalHeight * s);
+    if (img === DEFAULT_IMG.disc) g.imageSmoothingEnabled = true;
     g.restore();
     return;
   }
@@ -387,21 +405,24 @@ function drawDisc(g, cx, cy, R, p4) {
 }
 
 /**
- * Неподвижная звезда-игла слева от диска (реф-2): центр сидит на кромке диска,
- * длинный луч уходит вверх-вправо и кончиком прячется ПОД кромкой (рисуется до диска),
- * длинный луч тянется влево, короткие — вниз и вверх-влево.
+ * Неподвижная игла-звезда у левой кромки диска: рисуется ПОСЛЕ диска и рамки —
+ * центром сидит на кромке и заметно заезжает на круг («сейчас» — под ней).
+ * Штатная — пиксельная роза-звезда (сетка 32, индиго) по форме arrow.png;
+ * своя загрузка перекрывает её, центр картинки — в точке x.
  */
 function drawNeedle(g, x, y) {
-  // своя стрелочка: правым краем к кромке диска (рисуется до диска — остриё уходит под кромку)
-  const nimg = CUSTOM.needle;
+  // картинка-игла (своя или штатная): центр на кромке диска, часть звезды — на круге
+  const nimg = CUSTOM.needle || DEFAULT_IMG.needle;
   if (nimg && nimg.complete && nimg.naturalWidth > 0) {
     const h = 30;
     const w = nimg.naturalWidth * (h / nimg.naturalHeight);
-    g.drawImage(nimg, x + 4 - w, y - h / 2, w, h);
+    if (nimg === DEFAULT_IMG.needle) g.imageSmoothingEnabled = false; // штатная пиксельная игла
+    g.drawImage(nimg, x - w / 2, y - h / 2, w, h);
+    if (nimg === DEFAULT_IMG.needle) g.imageSmoothingEnabled = true;
     return;
   }
   // [угол, куда смотрит луч (математический, 0° = вправо), длина px]
-  const rays = [[58, 24], [184, 15], [288, 12], [130, 8]];
+  const rays = [[90, 17], [180, 17], [270, 17], [0, 17]];  // симметричная роза, как штатная игла
   const pt = (a, l) => [x + Math.cos(a * HUD_DEG) * l, y - Math.sin(a * HUD_DEG) * l];
   const path = () => {
     g.beginPath();
@@ -413,7 +434,7 @@ function drawNeedle(g, x, y) {
       const tip = pt(a0, l0);
       if (i === 0) g.moveTo(tip[0], tip[1]); else g.lineTo(tip[0], tip[1]);
       // «талия» между лучами — тем глубже, чем короче соседние лучи
-      const waist = Math.min(l0, l1) * 0.34;
+      const waist = Math.min(l0, l1) * 0.62;             // выемка ~60% луча (форма arrow.png)
       const mid = pt((a0 + a1n) / 2, waist);
       g.quadraticCurveTo(mid[0], mid[1], pt(a1, l1)[0], pt(a1n, l1)[1]);
     }
@@ -435,9 +456,9 @@ function drawNeedle(g, x, y) {
   g.lineCap = 'round';
   g.beginPath();
   g.moveTo(x - 1, y - 1.2);
-  g.lineTo(...pt(62, 10));
+  g.lineTo(...pt(88, 10));
   g.moveTo(x - 1, y + 1);
-  g.lineTo(...pt(183, 8));
+  g.lineTo(...pt(182, 8));
   g.stroke();
   g.fillStyle = 'rgba(255,255,255,0.65)';
   g.beginPath();
@@ -579,7 +600,7 @@ function drawTooltip(g, text, anchorX, anchorBottomY, alpha) {
   g.restore();
 }
 
-/** Один кадр HUD. Порядок: подложка → игла → большой диск → рамка → малый диск → тултип. */
+/** Один кадр HUD. Порядок: подложка → большой диск → рамка → игла → малый диск → тултип. */
 function drawHud(now) {
   const cv = document.getElementById('hud');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -598,9 +619,9 @@ function drawHud(now) {
   g.moveTo(satX + rs + 3.5, cy); g.arc(satX, cy, rs + 3.5, 0, Math.PI * 2);
   g.fill();
 
-  drawNeedle(g, needleX, cy);        // игла рисуется ДО диска: остриё уходит под кромку
   drawDisc(g, cx, cy, R, state.p4);
   stickerRing(g, cx, cy, R + 0.8);
+  drawNeedle(g, needleX, cy);        // игла ПОСЛЕ диска: заезжает на кромку круга
   drawSatellite(g, satX, cy, rs, now);
 
   // тултип по наведению
