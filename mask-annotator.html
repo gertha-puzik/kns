@@ -85,6 +85,7 @@ a{color:#9ad}
 <div id="stage">
  <div id="cvwrap"><canvas id="cv"></canvas><canvas id="cur"></canvas></div>
  <div class="hint"><kbd>ЛКМ</kbd> — инструмент по клику · <kbd>ПКМ</kbd> — всегда ластик (снять зону: пиксель уходит «телу», с «тела» — дыра, QC зажжётся) · <kbd>Alt+ЛКМ</kbd> — пипетка · <kbd>колесо</kbd> — зум · ластик работает и режимом.<br>
+ Хоткеи (работают в любой раскладке): <kbd>B</kbd>/<kbd>F</kbd>/<kbd>E</kbd>/<kbd>P</kbd> — кисть/ведро/ластик/пипетка · <kbd>Cmd+Z</kbd> или <kbd>Ctrl+Z</kbd> — отменить · <kbd>Cmd+Shift+Z</kbd> или <kbd>Ctrl+Y</kbd> — вернуть<br>
  Заливка: клик перекрашивает связный пятак одной зоны в выбранную. Правки живут в браузере (автосейв), после «пакета правок» файл отдай ИИ-конвейеру (kanban-карточке) — он продолжит канон.</div>
 </div>
 <script src="artpack/mask-annotator-data.js"></script>
@@ -236,9 +237,12 @@ var cv = $('cv'), cx = cv.getContext('2d');
 var cu = $('cur'), cc = cu.getContext('2d');
 var off = document.createElement('canvas'), offx = off.getContext('2d');
 var off2 = document.createElement('canvas'), off2x = off2.getContext('2d');
+const BASE_H = 150;   // эталонная высота кадра-«сетки»: все кадры на экране одной высоты
+function dScale() { return cur ? zoom * BASE_H / cur.h : zoom; } /* per-frame экранный масштаб: E/W (200×300) рисуются вдвое мельче нативного zoom */
 function render() {
   if (!cur) return;
-  cv.width = cur.w * zoom; cv.height = cur.h * zoom;
+  var sc = dScale();
+  cv.width = cur.w * sc; cv.height = cur.h * sc;
   cu.width = cv.width; cu.height = cv.height; cu.style.width = cv.style.width; cu.style.height = cv.style.height;
   cx.imageSmoothingEnabled = false;
   cx.clearRect(0, 0, cv.width, cv.height);
@@ -264,10 +268,10 @@ function render() {
     cx.drawImage(off, 0, 0, cv.width, cv.height);
     if (ed) { off2x.clearRect(0, 0, cur.w, cur.h); off2x.putImageData(em, 0, 0); cx.drawImage(off2, 0, 0, cv.width, cv.height); }
   }
-  if (showGrid && zoom >= 4) {
+  if (showGrid && sc >= 4) {
     cx.strokeStyle = 'rgba(255,255,255,.09)'; cx.beginPath();
-    for (var gx = 0; gx <= cur.w; gx++) { cx.moveTo(gx * zoom + .5, 0); cx.lineTo(gx * zoom + .5, cv.height); }
-    for (var gy = 0; gy <= cur.h; gy++) { cx.moveTo(0, gy * zoom + .5); cx.lineTo(cv.width, gy * zoom + .5); }
+    for (var gx = 0; gx <= cur.w; gx++) { cx.moveTo(gx * sc + .5, 0); cx.lineTo(gx * sc + .5, cv.height); }
+    for (var gy = 0; gy <= cur.h; gy++) { cx.moveTo(0, gy * sc + .5); cx.lineTo(cv.width, gy * sc + .5); }
     cx.stroke();
   }
 }
@@ -275,11 +279,12 @@ function render() {
 function drawCursor(mx, my) {
   cc.clearRect(0, 0, cu.width, cu.height);
   if (mx == null || !cur) return;
-  var r = radius * zoom;
+  var sc = dScale();
+  var r = radius * sc;
   cc.strokeStyle = tool === 'erase' ? 'rgba(255,80,80,.95)' : 'rgba(255,255,255,.85)';
   cc.lineWidth = 1.5;
   cc.beginPath();
-  cc.arc((mx + .5) * zoom, (my + .5) * zoom, Math.max(r - .5, 1), 0, Math.PI * 2);
+  cc.arc((mx + .5) * sc, (my + .5) * sc, Math.max(r - .5, 1), 0, Math.PI * 2);
   cc.stroke();
 }
 
@@ -391,7 +396,8 @@ function pickAt(x, y) {
 var mdown = false, lastPt = null, dirtyStroke = false;
 function evPt(ev) {
   var r = cv.getBoundingClientRect();
-  var x = Math.floor((ev.clientX - r.left) / zoom), y = Math.floor((ev.clientY - r.top) / zoom);
+  var sc = dScale();
+  var x = Math.floor((ev.clientX - r.left) / sc), y = Math.floor((ev.clientY - r.top) / sc);
   if (x < 0) x = 0; if (y < 0) y = 0;
   if (x >= cur.w) x = cur.w - 1; if (y >= cur.h) y = cur.h - 1;
   return [x, y];
@@ -648,12 +654,13 @@ function toolUI() {
 document.addEventListener('keydown', function (ev) {
   if (ev.target && /input|select|textarea/i.test(ev.target.tagName)) return;
   if (ev.ctrlKey || ev.metaKey) {
-    if (ev.key === 'z' && !ev.shiftKey) { ev.preventDefault(); doUndo(); }
-    if ((ev.key === 'Z' || (ev.key === 'z' && ev.shiftKey))) { ev.preventDefault(); doRedo(); }
+    if (ev.code === 'KeyZ' && !ev.shiftKey) { ev.preventDefault(); doUndo(); return; }
+    if (ev.code === 'KeyZ' && ev.shiftKey) { ev.preventDefault(); doRedo(); return; }
+    if (ev.code === 'KeyY') { ev.preventDefault(); doRedo(); return; }
     return;
   }
-  var m = { b: 'brush', f: 'fill', e: 'erase', p: 'pick' }[ev.key.toLowerCase()];
-  if (m) { tool = m; toolUI(); }
+  var m = { KeyB: 'brush', KeyF: 'fill', KeyE: 'erase', KeyP: 'pick' }[ev.code];
+  if (m) { ev.preventDefault(); tool = m; toolUI(); }   // ev.code — физическая клавиша, работает в русской раскладке
 });
 $('undo').addEventListener('click', doUndo);
 $('redo').addEventListener('click', doRedo);
