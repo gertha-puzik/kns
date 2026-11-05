@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Демо HUD coop-field</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 14px 16px;
+    background: #1d1f24; color: #e6e8ec;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    overflow-x: hidden;
+  }
+  .stage { display: flex; flex-direction: column; align-items: center; transform-origin: top center; }
+
+  h1 { margin: 0 0 4px; font-size: 22px; font-weight: 650; }
+  .hint { margin: 0 0 16px; color: #9aa1ad; font-size: 13px; max-width: 800px; text-align: center; }
+
+  /* «окно игры» 800×250 */
+  #game {
+    position: relative; width: 800px; height: 250px; flex: none;
+    border-radius: 10px; overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08);
+  }
+  #game canvas { position: absolute; left: 0; top: 0; width: 800px; height: 250px; display: block; }
+  #hud { cursor: default; }
+
+  /* панель управления — светлая, под окном (не в правом верхнем углу) */
+  #panel {
+    width: 800px; margin-top: 14px; padding: 14px 18px;
+    background: #f4f5f7; color: #22262d; border-radius: 10px;
+    display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: center;
+  }
+  #panel .lbl { font-weight: 600; font-size: 13px; color: #4a515c; white-space: nowrap; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button {
+    font: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer;
+    background: #fff; color: #22262d; border: 1px solid #c5cad3; border-radius: 7px;
+  }
+  button:hover { background: #eaf1fb; }
+  button.on { background: #2f6fd6; border-color: #2f6fd6; color: #fff; }
+  #p4 { flex: 1 1 360px; min-width: 240px; }
+  #p4val { font-variant-numeric: tabular-nums; min-width: 190px; color: #4a515c; font-size: 13px; }
+  .sep { width: 1px; height: 22px; background: #c5cad3; margin: 0 4px; }
+
+  /* слоты загрузки своих картинок: кнопка + ✕ сверху, рекомендованный размер снизу */
+  .slot { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+  .slotrow { display: inline-flex; align-items: center; gap: 4px; }
+  .slot label { font-size: 12.5px; padding: 5px 10px; background: #fff; border: 1px dashed #9aa5b5;
+                border-radius: 7px; cursor: pointer; max-width: 240px; overflow: hidden;
+                white-space: nowrap; text-overflow: ellipsis; }
+  .slot label:hover { background: #eaf1fb; }
+  .slot label.set { border-style: solid; border-color: #2f6fd6; color: #1c4f9e; }
+  .slot .dim { font-size: 11px; color: #8a93a3; line-height: 1.25; }
+  .custom-hint { grid-column: 2; color: #7c8492; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <h1>Демо HUD coop-field</h1>
+  <p class="hint">Редизайн HUD «время суток + погода»: диск вращается вместе со временем, «сейчас» — под звездой-иглой слева. Наведите курсор на циферблат или на значок погоды — появится подпись.</p>
+
+  <div id="game">
+    <canvas id="field"></canvas>
+    <canvas id="hud"></canvas>
+  </div>
+
+  <div id="panel">
+    <div class="lbl">Время суток</div>
+    <div class="row">
+      <input id="p4" type="range" min="0" max="4" step="0.005" value="1.5">
+      <span id="p4val"></span>
+    </div>
+
+    <div class="lbl">Пресеты</div>
+    <div class="row" id="presets">
+      <button data-p4="0.5">Утро</button>
+      <button data-p4="1.5">День</button>
+      <button data-p4="2.5">Вечер</button>
+      <button data-p4="3.5">Ночь</button>
+    </div>
+
+    <div class="lbl">Ход времени</div>
+    <div class="row" id="speeds">
+      <button data-speed="0" class="on">⏸ Пауза</button>
+      <button data-speed="1">▶ Играть x1</button>
+      <button data-speed="60">x60</button>
+      <button data-speed="300">x300</button>
+    </div>
+
+    <div class="lbl">Погода</div>
+    <div class="row" id="weathers">
+      <button data-w="sun" class="on">Солнечно</button>
+      <button data-w="cloud">Пасмурно</button>
+      <button data-w="rain">Дождь</button>
+    </div>
+
+    <div class="lbl">Свои картинки</div>
+    <div class="row" id="customs">
+      <span class="slot"><span class="slotrow"><input id="f-disc" type="file" accept="image/*" hidden data-k="disc"><label id="lbl-disc" for="f-disc" title="Большой круг время суток">Круг</label><button class="clr" data-k="disc" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 512×512 px, PNG (квадрат)</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-needle" type="file" accept="image/*" hidden data-k="needle"><label id="lbl-needle" for="f-needle" title="Звезда-игла слева от круга">Стрелочка</label><button class="clr" data-k="needle" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-sun" type="file" accept="image/*" hidden data-k="sun"><label id="lbl-sun" for="f-sun" title="Иконка «Солнечно»">Солнечно</label><button class="clr" data-k="sun" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-cloud" type="file" accept="image/*" hidden data-k="cloud"><label id="lbl-cloud" for="f-cloud" title="Иконка «Пасмурно»">Пасмурно</label><button class="clr" data-k="cloud" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+      <span class="slot"><span class="slotrow"><input id="f-rain" type="file" accept="image/*" hidden data-k="rain"><label id="lbl-rain" for="f-rain" title="Иконка «Дождь»">Дождь</label><button class="clr" data-k="rain" title="Вернуть рисованный">✕</button></span>
+        <span class="dim">рек. 64×64 px, PNG с прозрачностью</span></span>
+    </div>
+
+    <div class="lbl">Для художника</div>
+    <div class="row">
+      <button id="dl-svg">🧭 Скачать шаблон круга (SVG)</button>
+      <button id="dl-png">То же в PNG 1024×1024</button>
+      <span id="tpl-note" class="custom-hint">круг поделен на 4 сектора: ↖ утро, ↗ день, ↘ вечер, ↙ ночь; подрисуй своё окружение в каждом секторе и загрузи как «Круг» (сектор под иглой слева = текущее время, диск крутится против часовой)</span>
+    </div>
+
+    <div class="lbl">Показать вариант</div>
+    <div class="row">
+      <button id="snap">📷 Скачать кадр HUD (PNG)</button>
+      <span id="snapnote" class="custom-hint">подставь свои картинки, скачай кадр и кинь картинкой в чат — так предложишь свой вариант</span>
+    </div>
+
+    <div class="custom-hint">Загрузки хранятся в этом браузере (localStorage) и остаются после перезагрузки; ✕ — вернуть рисованный вариант.</div>
+
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ===================== Константы ===================== */
+
+const W = 800, H = 250;                        // размер «окна игры»
+const DAYPART_MS = 7 * 60 * 1000;              // одна часть суток = 7 минут
+const DAYPART_LABEL = ['Утро', 'День', 'Вечер', 'Ночь'];
+const WEATHER_LABEL = { sun: 'Солнечно', cloud: 'Пасмурно', rain: 'Дождь' };
+
+const HUD_DIAL_R = 34;         // радиус большого диска (время суток)
+const HUD_SAT_R = 13.5;        // радиус малого диска погоды (~40% диаметра большого)
+const HUD_SAT_OVERLAP = 0.12;  // насколько малый диск заходит на большой (доля его радиуса)
+const HUD_PAD = 12;            // отступ группы от угла окна
+const HUD_DEG = Math.PI / 180;
+const HUD_UNDERLAY = 'rgba(0,0,0,0.32)';       // тёмная подложка под группой (как в игре)
+
+/** Палитра по референсам заказчицы (чуть смягчена под стиль игры). */
+const COL = {
+  day: '#a9ccf8', night: '#1c2f57',
+  sun: '#f5820c', moon: '#efeda0',
+  needle: '#2b2b8a', sat: '#3f3fb8', satSun: '#f5c518',
+};
+
+/** Наклон линии раздела день/ночь при p4 = 0 (реф-1: из левого-низа в правый-верх). */
+const SPLIT_DEG = 35;
+
+/* ===================== Состояние демо ===================== */
+
+const state = {
+  p4: 1.5,              // прогресс суток 0..4
+  speed: 0,             // множитель хода времени (0 = пауза)
+  weather: 'sun',
+  weatherPrev: 'sun',
+  weatherAt: -1e9,      // момент смены погоды (performance.now) — для кроссфейда
+  hover: null,          // 'dial' | 'wx' | null
+  mouse: { x: 0, y: 0 },
+  hoverAt: 0,           // когда началось наведение (для плавного появления тултипа)
+};
+
+const dayPartOf = (p4) => Math.floor(((p4 % 4) + 4) % 4);
+
+/* Свои картинки: keys = data-k у инпутов. Хранятся и в localStorage (dataURL). */
+const CUSTOM = { disc: null, needle: null, sun: null, cloud: null, rain: null };
+const CUSTOM_LABEL = { disc: 'Круг', needle: 'Стрелочка', sun: 'Солнечно', cloud: 'Пасмурно', rain: 'Дождь' };
+const LS_KEY = 'weather-demo-custom-v1';
+
+function setCustomLabel(k, name, on) {
+  const el = $('lbl-' + k);
+  const nm = !name ? '' : (name.length > 20 ? name.slice(0, 18) + '…' : name);
+  el.textContent = on ? CUSTOM_LABEL[k] + ': ' + nm : CUSTOM_LABEL[k];
+  el.classList.toggle('set', !!on);
+}
+
+function saveCustomLS() {
+  const out = {};
+  for (const k in CUSTOM) if (CUSTOM[k]) out[k] = { src: CUSTOM[k].src, name: CUSTOM[k].dataset.name || '' };
+  try { localStorage.setItem(LS_KEY, JSON.stringify(out)); }
+  catch (e) {
+    const n = $('snapnote');
+    if (n) n.textContent = '⚠ картинка не влезла в хранилище браузера — после перезагрузки загрузи её заново';
+  }
+}
+
+function applyCustom(k, img, name) {
+  CUSTOM[k] = img;
+  img.dataset.name = name || '';
+  setCustomLabel(k, name, true);
+  saveCustomLS();
+}
+
+function clearCustom(k) {
+  CUSTOM[k] = null;
+  const inp = document.querySelector('#customs input[data-k="' + k + '"]');
+  if (inp) inp.value = '';
+  setCustomLabel(k, null, false);
+  saveCustomLS();
+}
+
+function loadCustomLS() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) { return; }
+  if (!saved) return;
+  for (const k in saved) {
+    const rec = saved[k];
+    if (!rec || !rec.src) continue;
+    const img = new Image();
+    img.onload = () => { CUSTOM[k] = img; setCustomLabel(k, rec.name, true); };
+    img.src = rec.src;
+  }
+}
+
+/* ===================== Фон-сцена: травяное поле ===================== */
+
+function drawField() {
+  const cv = document.getElementById('field');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * dpr);
+  cv.height = Math.round(H * dpr);
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // шахматка клеток, едва заметная
+  const T = 50;
+  for (let y = 0; y < H / T; y++) {
+    for (let x = 0; x < W / T; x++) {
+      g.fillStyle = (x + y) % 2 ? '#7fae52' : '#7bab4e';
+      g.fillRect(x * T, y * T, T, T);
+    }
+  }
+
+  // детерминированный псевдослучайный генератор — фон один и тот же при каждом открытии
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+  // тёмные и светлые пятна травы
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 18 + rnd() * 40;
+    g.fillStyle = i % 2 ? 'rgba(70,120,45,0.22)' : 'rgba(170,205,100,0.20)';
+    g.beginPath();
+    g.ellipse(x, y, r, r * 0.65, rnd() * 3, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  // пучки травинок
+  g.lineCap = 'round';
+  for (let i = 0; i < 90; i++) {
+    const x = rnd() * W, y = rnd() * H;
+    g.strokeStyle = 'rgba(52,100,36,0.55)';
+    g.lineWidth = 1.6;
+    for (let k = -1; k <= 1; k++) {
+      g.beginPath();
+      g.moveTo(x + k * 3, y);
+      g.lineTo(x + k * 5, y - 6 - rnd() * 3);
+      g.stroke();
+    }
+  }
+}
+
+/* ===================== HUD ===================== */
+
+/** Геометрия HUD в координатах окна игры: считается от правого верхнего угла. */
+function hudGeometry() {
+  const R = HUD_DIAL_R, rs = HUD_SAT_R;
+  const satX = W - HUD_PAD - rs - 1;                 // малый диск не выходит за кромку окна
+  const cy = HUD_PAD + R + 3;                        // общая вертикаль центров
+  const cx = satX - (R + rs * (1 - HUD_SAT_OVERLAP)); // малый диск слегка наезжает на большой
+  return { R, rs, cx, cy, satX, needleX: cx - R - 3 };
+}
+
+/** Облако-«пузырьки»: четыре круга и плоская подошва. s — масштаб, (x, y) — центр. */
+function cloudBubble(g, x, y, s, fill) {
+  const bub = [[-1.0, 0.2, 0.62], [-0.2, -0.35, 0.85], [0.75, 0.0, 0.7], [1.35, 0.3, 0.5]];
+  g.fillStyle = fill;
+  g.beginPath();
+  for (const [dx, dy, r] of bub) {
+    g.moveTo(x + (dx + r - 0.2) * s, y + dy * s);
+    g.arc(x + (dx - 0.2) * s, y + dy * s, r * s, 0, Math.PI * 2);
+  }
+  g.rect(x - 1.2 * s, y + 0.2 * s, 2.35 * s, 0.62 * s);
+  g.fill();
+}
+
+/** Четырёхлучевая искра (звёздочка ночи): тонкие лучи с вогнутыми боками. */
+function hudSpark(g, x, y, r, fill) {
+  const k = r * 0.2;
+  g.fillStyle = fill;
+  g.beginPath();
+  g.moveTo(x, y - r);
+  g.quadraticCurveTo(x + k, y - k, x + r, y);
+  g.quadraticCurveTo(x + k, y + k, x, y + r);
+  g.quadraticCurveTo(x - k, y + k, x - r, y);
+  g.quadraticCurveTo(x - k, y - k, x, y - r);
+  g.closePath();
+  g.fill();
+}
+
+/** Солнце большого диска: оранжевое ядро + «отклеенное» кольцо треугольных лучей. */
+function discSun(g, x, y, R) {
+  g.fillStyle = COL.sun;
+  g.beginPath();
+  g.arc(x, y, R * 0.17, 0, Math.PI * 2);
+  g.fill();
+  const n = 12;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + 0.1;
+    const r1 = R * 0.25;                              // зазор между ядром и лучами
+    const r2 = R * (i % 2 ? 0.38 : 0.43);             // чуть разная длина — «живой» рисунок
+    const da = 0.17;
+    g.beginPath();
+    g.moveTo(x + Math.cos(a - da) * r1, y + Math.sin(a - da) * r1);
+    g.lineTo(x + Math.cos(a) * r2, y + Math.sin(a) * r2);
+    g.lineTo(x + Math.cos(a + da) * r1, y + Math.sin(a + da) * r1);
+    g.closePath();
+    g.fill();
+  }
+}
+
+/**
+ * Большой диск по реф-1: одна диагональная линия делит круг на день (верх-лево) и ночь
+ * (низ-право). Весь рисунок поворачивается: при p4 = 0 наклон ровно как на референсе,
+ * дальше диск крутится против часовой стрелки на 90° за каждую часть суток, т.е.
+ * один оборот за 28 минут. Под неподвижной иглой слева оказывается «сейчас».
+ * Координаты рисунка заданы в долях радиуса (x вправо, y ВВЕРХ), P() переводит их в canvas.
+ */
+function drawDisc(g, cx, cy, R, p4) {
+  const P = (x, y) => [x * R, -y * R];
+  g.save();
+  g.beginPath();
+  g.arc(cx, cy, R, 0, Math.PI * 2);
+  g.clip();
+  g.translate(cx, cy);
+  g.rotate(-(p4 * 90) * HUD_DEG);
+
+  // свой круг: вписан в диаметр (cover) и вращается вместе с диском
+  const img = CUSTOM.disc;
+  if (img && img.complete && img.naturalWidth > 0) {
+    const s = Math.max((2 * R) / img.naturalWidth, (2 * R) / img.naturalHeight);
+    g.drawImage(img, -img.naturalWidth * s / 2, -img.naturalHeight * s / 2,
+      img.naturalWidth * s, img.naturalHeight * s);
+    g.restore();
+    return;
+  }
+
+  // ночь — вся подложка, день — полуплоскость над линией раздела
+  g.fillStyle = COL.night;
+  g.fillRect(-R, -R, 2 * R, 2 * R);
+  g.save();
+  g.rotate(-SPLIT_DEG * HUD_DEG);
+  g.fillStyle = COL.day;
+  g.fillRect(-R * 1.3, -R * 1.3, R * 2.6, R * 1.3);
+  g.restore();
+
+  // день: солнце, облака (верхнее перекрывает лучи солнца, нижнее лежит на границе)
+  discSun(g, ...P(-0.27, 0.37), R);
+  cloudBubble(g, ...P(-0.26, 0.66), R * 0.16, '#ffffff');
+  cloudBubble(g, ...P(0.26, 0.5), R * 0.12, '#ffffff');
+  cloudBubble(g, ...P(-0.48, -0.22), R * 0.15, '#ffffff');
+
+  // ночь: толстый серп (вогнутостью к солнцу) и искры
+  const [mx, my] = P(0.28, -0.37);
+  g.fillStyle = COL.moon;
+  g.beginPath();
+  g.arc(mx, my, R * 0.36, 0, Math.PI * 2);
+  g.fill();
+  const [bx, by] = P(0.28 - 0.17 * 0.57, -0.37 + 0.17 * 0.82);   // «откус» смещён к солнцу (125°)
+  g.fillStyle = COL.night;
+  g.beginPath();
+  g.arc(bx, by, R * 0.31, 0, Math.PI * 2);
+  g.fill();
+  const stars = [[0.73, 0.30, 0.07], [0.82, 0.04, 0.09], [0.14, -0.08, 0.06], [0.72, -0.27, 0.07],
+                 [-0.46, -0.64, 0.09], [-0.18, -0.8, 0.11], [0.4, -0.74, 0.08]];
+  for (const [sx, sy, sr] of stars) hudSpark(g, ...P(sx, sy), sr * R, COL.moon);
+  g.restore();
+}
+
+/**
+ * Неподвижная звезда-игла слева от диска (реф-2): центр сидит на кромке диска,
+ * длинный луч уходит вверх-вправо и кончиком прячется ПОД кромкой (рисуется до диска),
+ * длинный луч тянется влево, короткие — вниз и вверх-влево.
+ */
+function drawNeedle(g, x, y) {
+  // своя стрелочка: правым краем к кромке диска (рисуется до диска — остриё уходит под кромку)
+  const nimg = CUSTOM.needle;
+  if (nimg && nimg.complete && nimg.naturalWidth > 0) {
+    const h = 30;
+    const w = nimg.naturalWidth * (h / nimg.naturalHeight);
+    g.drawImage(nimg, x + 4 - w, y - h / 2, w, h);
+    return;
+  }
+  // [угол, куда смотрит луч (математический, 0° = вправо), длина px]
+  const rays = [[58, 24], [184, 15], [288, 12], [130, 8]];
+  const pt = (a, l) => [x + Math.cos(a * HUD_DEG) * l, y - Math.sin(a * HUD_DEG) * l];
+  const path = () => {
+    g.beginPath();
+    const n = rays.length;
+    for (let i = 0; i < n; i++) {
+      const [a0, l0] = rays[i];
+      const [a1, l1] = rays[(i + 1) % n];
+      const a1n = a1 + (i === n - 1 ? 360 : 0);
+      const tip = pt(a0, l0);
+      if (i === 0) g.moveTo(tip[0], tip[1]); else g.lineTo(tip[0], tip[1]);
+      // «талия» между лучами — тем глубже, чем короче соседние лучи
+      const waist = Math.min(l0, l1) * 0.34;
+      const mid = pt((a0 + a1n) / 2, waist);
+      g.quadraticCurveTo(mid[0], mid[1], pt(a1, l1)[0], pt(a1n, l1)[1]);
+    }
+    g.closePath();
+  };
+
+  g.lineJoin = 'round';
+  path();
+  g.lineWidth = 3.2;
+  g.strokeStyle = 'rgba(255,255,255,0.92)';          // «стикерная» светлая кромка
+  g.stroke();
+  g.fillStyle = COL.needle;
+  path();
+  g.fill();
+
+  // лёгкие блики вдоль длинного луча и точка в центре
+  g.strokeStyle = 'rgba(255,255,255,0.45)';
+  g.lineWidth = 1;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(x - 1, y - 1.2);
+  g.lineTo(...pt(62, 10));
+  g.moveTo(x - 1, y + 1);
+  g.lineTo(...pt(183, 8));
+  g.stroke();
+  g.fillStyle = 'rgba(255,255,255,0.65)';
+  g.beginPath();
+  g.arc(x, y, 1, 0, Math.PI * 2);
+  g.fill();
+}
+
+/** Тонкая светлая обводка «стикером»: окружность с лёгким дрожанием радиуса (~2–3%). */
+function stickerRing(g, cx, cy, r) {
+  g.beginPath();
+  const n = 90;
+  for (let i = 0; i <= n; i++) {
+    const t = (i / n) * Math.PI * 2;
+    const k = 1 + 0.014 * Math.sin(3 * t + 1) + 0.009 * Math.sin(7 * t + 2) + 0.006 * Math.sin(11 * t);
+    const x = cx + Math.cos(t) * r * k, y = cy + Math.sin(t) * r * k;
+    if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.closePath();
+  g.strokeStyle = 'rgba(255,255,255,0.92)';
+  g.lineWidth = 1.6;
+  g.stroke();
+}
+
+/** Значок погоды в малом диске (r — радиус диска): толстое «детское» солнце / облако / дождь. */
+function satIcon(g, x, y, r, kind) {
+  if (kind === 'sun') {
+    g.strokeStyle = COL.satSun;
+    g.lineWidth = r * 0.18;
+    g.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + 0.2;
+      const r1 = r * 0.52, r2 = r * (i % 2 ? 0.74 : 0.82);
+      const w = (i % 2 ? 1 : -1) * r * 0.07;                  // лёгкая волна луча
+      const mx = x + Math.cos(a) * (r1 + r2) / 2 - Math.sin(a) * w;
+      const my = y + Math.sin(a) * (r1 + r2) / 2 + Math.cos(a) * w;
+      g.beginPath();
+      g.moveTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+      g.quadraticCurveTo(mx, my, x + Math.cos(a) * r2, y + Math.sin(a) * r2);
+      g.stroke();
+    }
+    g.fillStyle = COL.satSun;
+    g.beginPath();
+    g.arc(x, y, r * 0.4, 0, Math.PI * 2);
+    g.fill();
+    return;
+  }
+  if (kind === 'cloud') {
+    cloudBubble(g, x - r * 0.05, y + r * 0.02, r * 0.27, '#ffffff');
+    return;
+  }
+  g.strokeStyle = '#6ec0ff';
+  g.lineWidth = r * 0.12;
+  g.lineCap = 'round';
+  for (let i = -1; i <= 2; i++) {
+    const dx = (i - 0.5) * r * 0.3;
+    g.beginPath();
+    g.moveTo(x + dx + r * 0.05, y + r * 0.3);
+    g.lineTo(x + dx - r * 0.1, y + r * 0.62);
+    g.stroke();
+  }
+  cloudBubble(g, x - r * 0.05, y - r * 0.2, r * 0.27, '#ffffff');
+}
+
+/** Значок погоды: своя картинка (вписана внутрь диска) или рисованный значок. */
+function satPicture(g, x, y, r, kind) {
+  const pimg = CUSTOM[kind];
+  if (pimg && pimg.complete && pimg.naturalWidth > 0) {
+    const box = r * 1.7;
+    const s = Math.min(box / pimg.naturalWidth, box / pimg.naturalHeight);
+    const w = pimg.naturalWidth * s, h = pimg.naturalHeight * s;
+    g.drawImage(pimg, x - w / 2, y - h / 2, w, h);
+    return;
+  }
+  satIcon(g, x, y, r, kind);
+}
+
+/** Малый диск погоды с кроссфейдом ~900 мс при смене. */
+function drawSatellite(g, x, y, r, now) {
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.fillStyle = COL.sat;
+  g.fill();
+  const wt = Math.min(1, Math.max(0, (now - state.weatherAt) / 900));
+  g.save();
+  g.beginPath();
+  g.arc(x, y, r - 0.5, 0, Math.PI * 2);
+  g.clip();
+  if (wt < 1) {
+    g.globalAlpha = 1 - wt;
+    satPicture(g, x, y, r, state.weatherPrev);
+  }
+  g.globalAlpha = wt;
+  satPicture(g, x, y, r, state.weather);
+  g.restore();
+  g.globalAlpha = 1;
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.strokeStyle = 'rgba(255,255,255,0.9)';
+  g.lineWidth = 1.4;
+  g.stroke();
+}
+
+/** Путь скруглённого прямоугольника (для тултипа). */
+function roundRectPath(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+/** Тултип с хвостиком под элементом; alpha — плавное появление. */
+function drawTooltip(g, text, anchorX, anchorBottomY, alpha) {
+  g.save();
+  g.globalAlpha = alpha;
+  g.font = '12px system-ui, -apple-system, "Segoe UI", sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  const padX = 9, h = 22, tail = 6;
+  const w = Math.ceil(g.measureText(text).width) + padX * 2;
+  // плашка не вылезает за край окна, хвостик остаётся под элементом
+  const x = Math.min(W - 6 - w, Math.max(6, anchorX - w / 2));
+  const y = anchorBottomY + tail + 4;
+
+  g.fillStyle = 'rgba(14,16,22,0.82)';
+  roundRectPath(g, x, y, w, h, 6);
+  g.fill();
+  g.beginPath();                                    // хвостик вверх, к элементу
+  g.moveTo(anchorX - tail, y + 0.5);
+  g.lineTo(anchorX, y - tail);
+  g.lineTo(anchorX + tail, y + 0.5);
+  g.closePath();
+  g.fill();
+
+  g.fillStyle = '#fff';
+  g.fillText(text, x + w / 2, y + h / 2 + 0.5);
+  g.restore();
+}
+
+/** Один кадр HUD. Порядок: подложка → игла → большой диск → рамка → малый диск → тултип. */
+function drawHud(now) {
+  const cv = document.getElementById('hud');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+  if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+
+  const { R, rs, cx, cy, satX, needleX } = hudGeometry();
+
+  // общая полупрозрачная подложка под диском и малым диском (для читаемости на поле)
+  g.fillStyle = HUD_UNDERLAY;
+  g.beginPath();
+  g.moveTo(cx + R + 4, cy); g.arc(cx, cy, R + 4, 0, Math.PI * 2);
+  g.moveTo(satX + rs + 3.5, cy); g.arc(satX, cy, rs + 3.5, 0, Math.PI * 2);
+  g.fill();
+
+  drawNeedle(g, needleX, cy);        // игла рисуется ДО диска: остриё уходит под кромку
+  drawDisc(g, cx, cy, R, state.p4);
+  stickerRing(g, cx, cy, R + 0.8);
+  drawSatellite(g, satX, cy, rs, now);
+
+  // тултип по наведению
+  if (state.hover) {
+    const a = Math.min(1, (now - state.hoverAt) / 120);
+    if (state.hover === 'dial') {
+      drawTooltip(g, DAYPART_LABEL[dayPartOf(state.p4)], cx, cy + R + 2, a);
+    } else {
+      drawTooltip(g, WEATHER_LABEL[state.weather], satX, cy + rs + 2, a);
+    }
+  }
+}
+
+/** Что под курсором: малый диск погоды (он сверху) или большой диск. */
+function hitTest(mx, my) {
+  const { R, rs, cx, cy, satX } = hudGeometry();
+  if (Math.hypot(mx - satX, my - cy) <= rs + 1.5) return 'wx';
+  if (Math.hypot(mx - cx, my - cy) <= R + 2) return 'dial';
+  return null;
+}
+
+/* ===================== Управление ===================== */
+
+const $ = (id) => document.getElementById(id);
+const slider = $('p4');
+const readout = $('p4val');
+
+function setActive(groupId, attr, value) {
+  for (const b of $(groupId).querySelectorAll('button')) {
+    b.classList.toggle('on', b.dataset[attr] === String(value));
+  }
+}
+
+function updateReadout() {
+  const p = state.p4;
+  const part = DAYPART_LABEL[dayPartOf(p)];
+  const mins = Math.floor((p / 4) * 28);  // минута внутри 28-минутного оборота
+  readout.textContent = `p4 = ${p.toFixed(3)} · ${part} · ${mins} из 28 мин`;
+  // подсвечиваем пресет, если время совпало с ним (с точностью ползунка)
+  for (const b of $('presets').querySelectorAll('button')) {
+    b.classList.toggle('on', Math.abs(parseFloat(b.dataset.p4) - p) < 0.02);
+  }
+}
+
+slider.addEventListener('input', () => {
+  state.p4 = parseFloat(slider.value);
+  updateReadout();
+});
+
+$('presets').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.p4 = parseFloat(b.dataset.p4);
+  slider.value = state.p4;
+  updateReadout();
+});
+
+$('speeds').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.speed = parseFloat(b.dataset.speed);
+  setActive('speeds', 'speed', b.dataset.speed);
+});
+
+$('weathers').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || b.dataset.w === state.weather) return;
+  state.weatherPrev = state.weather;
+  state.weather = b.dataset.w;
+  state.weatherAt = performance.now();
+  setActive('weathers', 'w', state.weather);
+});
+
+/* Свои картинки: файл → dataURL (живёт и в localStorage), ✕ возвращает рисованный вид. */
+$('customs').addEventListener('change', (e) => {
+  const inp = e.target;
+  if (inp.tagName !== 'INPUT' || !inp.files || !inp.files[0]) return;
+  const k = inp.dataset.k;
+  const file = inp.files[0];
+  const rd = new FileReader();
+  rd.onload = () => {
+    const img = new Image();
+    img.onload = () => applyCustom(k, img, file.name);
+    img.onerror = () => { (window.__errs = window.__errs || []).push('custom img: ' + file.name); };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(file);
+});
+
+$('customs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button.clr');
+  if (!btn) return;
+  clearCustom(btn.dataset.k);
+});
+
+/* ===================== Шаблон круга для художника =====================
+ * Разметка совпадает с механикой демки: диск вращается против часовой 90° за
+ * часть суток, «сейчас» всегда у звезды-иглы СЛЕВА. Сектор, который в момент
+ * p4=0 (начало утро) примыкает к игле, — «Утро» и далее по ходу: день, вечер, ночь.
+ * Углы в экранных координатах (0° = право, 90° = низ): Утро 180–270 (лево→верх),
+ * День 270–360 (верх→право), Вечер 0–90 (право→низ), Ночь 90–180 (низ→лево). */
+function templateSVG() {
+  const C = 512, R = 506;
+  const P = (ang, r) => [C + r * Math.cos(ang * Math.PI / 180), C + r * Math.sin(ang * Math.PI / 180)];
+  const sectors = [
+    { name: 'Утро', from: 180, to: 270, fill: '#f8b195' },
+    { name: 'День', from: 270, to: 360, fill: '#a9ccf8' },
+    { name: 'Вечер', from: 0, to: 90, fill: '#e07a5f' },
+    { name: 'Ночь', from: 90, to: 180, fill: '#1c2f57' },
+  ];
+  let body = '';
+  for (const s of sectors) {
+    const [x1, y1] = P(s.from, R), [x2, y2] = P(s.to, R);
+    body += '  <path d="M ' + C + ' ' + C + ' L ' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
+      ' A ' + R + ' ' + R + ' 0 0 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1) + ' Z" fill="' + s.fill +
+      '" stroke="rgba(20,25,45,0.35)" stroke-width="2"/>\n';
+    const mid = (s.from + s.to) / 2;
+    const [tx, ty] = P(mid, R * 0.60);
+    const dark = s.name === 'Ночь';
+    body += '  <text x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) +
+      '" text-anchor="middle" dominant-baseline="middle" font-size="72"' +
+      ' font-family="system-ui, -apple-system, \'Segoe UI\', sans-serif" font-weight="650" fill="' +
+      (dark ? '#fff' : '#22262d') + '" opacity="0.85">' + s.name + '</text>\n';
+  }
+  // дуга направления вращения (против часовой) в секторе «День»
+  const rA = R - 44;
+  const [ax, ay] = P(340, rA), [bx, by] = P(282, rA);
+  body += '  <path d="M ' + ax.toFixed(1) + ' ' + ay.toFixed(1) + ' A ' + rA + ' ' + rA +
+    ' 0 0 0 ' + bx.toFixed(1) + ' ' + by.toFixed(1) + '" fill="none" stroke="#22262d"' +
+    ' stroke-width="5" stroke-linecap="round" opacity="0.8"/>\n';
+  const t2 = 282 * Math.PI / 180;
+  const ux = Math.sin(t2), uy = -Math.cos(t2);            // тангенс против часовой
+  const qx = Math.cos(t2), qy = Math.sin(t2);             // наружная нормаль
+  const tipX = bx + ux * 26, tipY = by + uy * 26;
+  body += '  <polygon points="' + tipX.toFixed(1) + ',' + tipY.toFixed(1) + ' ' +
+    (bx + qx * 12).toFixed(1) + ',' + (by + qy * 12).toFixed(1) + ' ' +
+    (bx - qx * 12).toFixed(1) + ',' + (by - qy * 12).toFixed(1) +
+    '" fill="#22262d" opacity="0.8"/>\n';
+  // метка под иглой: слева, чуть ниже оси (в секторе ночи — не мешает утренней четверти)
+  const [nx, ny] = P(180, R * 0.80);
+  body += '  <text x="' + (nx + 6) + '" y="' + (ny + 24) +
+    '" font-size="30" font-family="system-ui, -apple-system, \'Segoe UI\', sans-serif"' +
+    ' font-weight="650" fill="#22262d" opacity="0.6">← игла «сейчас»</text>\n';
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<!-- Шаблон круга HUD «время суток»: 4 сектора-четверти. Подрисуй в каждом секторе\n' +
+    '     подходящее окружение (небо/свет/звёзды), экспортируй PNG 1024x1024 и загрузи\n' +
+    '     как «Круг» в демке. Диск крутится против часовой, слева у иглы — текущее время. -->\n' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">\n' +
+    ' <title>Круг время суток — шаблон секторов</title>\n' + body + '</svg>\n';
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.download = name;
+  a.href = url;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+$('dl-svg').addEventListener('click', () => {
+  downloadBlob(new Blob([templateSVG()], { type: 'image/svg+xml' }), 'hud-circle-template.svg');
+});
+
+$('dl-png').addEventListener('click', () => {
+  const svg = templateSVG();
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas');
+    cv.width = 1024; cv.height = 1024;
+    cv.getContext('2d').drawImage(img, 0, 0, 1024, 1024);
+    cv.toBlob((b) => downloadBlob(b, 'hud-circle-template-1024.png'), 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+});
+
+/* Кадр HUD → PNG: девочки скачивают и кидают картинкой, чтобы предложить вариант. */
+$('snap').addEventListener('click', () => {
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const og = off.getContext('2d');
+  og.drawImage($('field'), 0, 0, W, H);
+  og.drawImage($('hud'), 0, 0, W, H);
+  const a = document.createElement('a');
+  a.download = 'weather-hud-variant.png';
+  a.href = off.toDataURL('image/png');
+  a.click();
+});
+
+loadCustomLS();
+
+const hudCv = $('hud');
+hudCv.addEventListener('mousemove', (e) => {
+  const r = hudCv.getBoundingClientRect();
+  state.mouse.x = (e.clientX - r.left) * (W / r.width);
+  state.mouse.y = (e.clientY - r.top) * (H / r.height);
+  const h = hitTest(state.mouse.x, state.mouse.y);
+  if (h !== state.hover) { state.hover = h; state.hoverAt = performance.now(); }
+});
+hudCv.addEventListener('mouseleave', () => { state.hover = null; });
+
+/* ===================== Вписывание в окно браузера ===================== */
+
+/**
+ * Вся демо-страница (заголовок + окно игры + панель) вписывается в видимую область
+ * без прокрутки. Масштабируем через CSS `zoom`: он меняет и layout-размер, поэтому
+ * скролл не появляется, а координаты мыши считаются по getBoundingClientRect —
+ * ховер остаётся корректным при любом масштабе.
+ * Доводка идёт покадрово: чтение scrollHeight сразу после установки zoom
+ * может отдать устаревшее значение, поэтому меряем на следующем кадре.
+ */
+let fitScale = 1, fitTries = 0;
+function fitStage() {
+  const stage = $('stage');
+  stage.style.zoom = '1';
+  const r = stage.getBoundingClientRect();
+  // ~34px — не зумируемый остаток (паддинги body + запас)
+  fitScale = Math.min(1, (window.innerHeight - 34 - r.top) / r.height);
+  fitTries = 0;
+  stage.style.zoom = String(fitScale);
+  if (fitScale < 1) requestAnimationFrame(fitNext);
+}
+function fitNext() {
+  if (document.documentElement.scrollHeight <= window.innerHeight) return;
+  fitTries += 1;
+  if (fitTries > 60) return;
+  fitScale = Math.max(0.3, fitScale - 0.008);
+  $('stage').style.zoom = String(fitScale);
+  requestAnimationFrame(fitNext);
+}
+window.addEventListener('resize', fitStage);
+
+/* ===================== Главный цикл ===================== */
+
+let last = performance.now();
+function frame(now) {
+  const dt = now - last;
+  last = now;
+  if (state.speed > 0) {
+    // 1 часть суток = 7 минут реального времени при x1
+    state.p4 = (state.p4 + (dt / DAYPART_MS) * state.speed) % 4;
+    slider.value = state.p4;
+    updateReadout();
+  }
+  drawHud(now);
+  requestAnimationFrame(frame);
+}
+
+drawField();
+updateReadout();
+fitStage();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
