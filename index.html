@@ -66,6 +66,16 @@
     <div class="note" id="skip-note" style="display:none;color:#933"></div>
   </div>
 
+  <div class="panel" style="max-width:300px" id="model-panel">
+    <div class="catname">Модель — база M2</div>
+    <canvas id="model" width="100" height="150"></canvas>
+    <div class="row" style="margin-bottom:1px">Телосложение:</div>
+    <div class="row" id="model-build"></div>
+    <div class="row" style="margin-bottom:1px">Хвост:</div>
+    <div class="row" id="model-tail"></div>
+    <div class="note">Поза — общая с котом слева. «Хвост» действует на ходьбу (сид — калачик: ситы с хвостом-вниз не заказаны). Импорт кода из CatWar сбрасывает обе опции в дефолт: среднее + вверх (родная M2).</div>
+  </div>
+
   <div class="panel" style="max-width:470px; flex:1">
     <div class="hdr" id="slot-title">Слот</div>
     <div id="slot-elems"></div>
@@ -267,7 +277,7 @@ let tailFrame = 0, tailAcc = 0;
 function frameOf(num) {
   return ((M.walk.tailSlots || []).indexOf(num) !== -1) ? tailFrame : frame;
 }
-function startAnim() { stopAnim(); frame = 0; frameAcc = 0; tailFrame = 0; tailAcc = 0; lastTs = 0; animTimer = setInterval(tick, 40); }
+function startAnim() { stopAnim(); frame = 0; frameAcc = 0; tailFrame = 0; tailAcc = 0; lastTs = 0; modelFrame = 0; modelAcc = 0; animTimer = setInterval(tick, 40); }
 function stopAnim() { if (animTimer) { clearInterval(animTimer); animTimer = null; } }
 function tick() {
   const now = Date.now();
@@ -281,7 +291,11 @@ function tick() {
   tailAcc += dt;
   let guard2 = 0;
   while (tailAcc >= tms[tailFrame] && guard2++ < 10) { tailAcc -= tms[tailFrame]; tailFrame = (tailFrame + 1) % tms.length; }
+  modelAcc += dt;
+  let guard3 = 0;
+  while (modelAcc >= MODEL_WALK_MS && guard3++ < 10) { modelAcc -= MODEL_WALK_MS; modelFrame = (modelFrame + 1) % 4; }
   render();
+  renderModel();
 }
 function setPose(newPose) {
   if (newPose !== 'sit' && newPose !== 'walk') return;
@@ -292,12 +306,99 @@ function setPose(newPose) {
   stopAnim();
   if (pose === 'walk') startAnim();
   render();
+  renderModel();
   updatePoseButtons();
 }
 function updatePoseButtons() {
   document.getElementById('btn-sit').classList.toggle('active', pose === 'sit');
   document.getElementById('btn-walk').classList.toggle('active', pose === 'walk');
 }
+
+// ---------- модель M2: телосложение × хвост (решение заказчицы 2026-11-05, архив-коммит 8fbb93b) ----------
+// Ассеты: model/*.png — 3 сита (калачик) + 6 walk-серий по 4 фазы (3 телосложения × 2 хвоста).
+// Дефолт: среднее + вверх = родная M2 (native walk = E-серия, фитом 100×150).
+// Хвост действует на ходьбу; ситы с хвостом-вниз не заказаны (см. /archive, раздел bodyforms).
+// Импорт кода окраса из CatWar («Применить код») сбрасывает обе опции в дефолт.
+const LS_MODEL_OPTS = 'coop_kns_model_opts';
+const MODEL_WALK_MS = 280; // равномерно, как живые анимации витрины /archive (не хореография CatWar-арта)
+const MODEL_FRAMES_WALK = {
+  norm: {
+    up:   ['model/walk_norm_up_k0.png', 'model/walk_norm_up_k1.png', 'model/walk_norm_up_k2.png', 'model/walk_norm_up_k3.png'],
+    down: ['model/walk_norm_down_k0.png', 'model/walk_norm_down_k1.png', 'model/walk_norm_down_k2.png', 'model/walk_norm_down_k3.png']
+  },
+  thin: {
+    up:   ['model/walk_thin_up_k0.png', 'model/walk_thin_up_k1.png', 'model/walk_thin_up_k2.png', 'model/walk_thin_up_k3.png'],
+    down: ['model/walk_thin_down_k0.png', 'model/walk_thin_down_k1.png', 'model/walk_thin_down_k2.png', 'model/walk_thin_down_k3.png']
+  },
+  chub: {
+    up:   ['model/walk_chub_up_k0.png', 'model/walk_chub_up_k1.png', 'model/walk_chub_up_k2.png', 'model/walk_chub_up_k3.png'],
+    down: ['model/walk_chub_down_k0.png', 'model/walk_chub_down_k1.png', 'model/walk_chub_down_k2.png', 'model/walk_chub_down_k3.png']
+  }
+};
+const MODEL_FRAMES_SIT = { norm: 'model/sit_norm.png', thin: 'model/sit_thin.png', chub: 'model/sit_chub.png' };
+const MODEL_BUILDS = [['norm', 'Среднее'], ['thin', 'Худой'], ['chub', 'Пухлый']];
+const MODEL_TAILS = [['up', 'Вверх'], ['down', 'Вниз']];
+let modelOpts = { build: 'norm', tail: 'up' };
+let modelFrame = 0, modelAcc = 0;
+const mcv = document.getElementById('model');
+mcv.style.width = Math.round(W * 2.4) + 'px';
+mcv.style.height = Math.round(H * 2.4) + 'px';
+const mctx = mcv.getContext('2d');
+const modelImgs = {};
+function modelImg(src) {
+  if (modelImgs[src] === undefined) {
+    const im = new Image();
+    im.onload = renderModel;
+    im.onerror = function () { modelImgs[src] = null; };
+    im.src = src;
+    modelImgs[src] = im;
+  }
+  return modelImgs[src];
+}
+function modelFile() {
+  if (pose === 'walk') return MODEL_FRAMES_WALK[modelOpts.build][modelOpts.tail][modelFrame % 4];
+  return MODEL_FRAMES_SIT[modelOpts.build];
+}
+function renderModel() {
+  mctx.clearRect(0, 0, W, H);
+  const im = modelImg(modelFile());
+  if (im && im.complete && im.naturalWidth > 0) mctx.drawImage(im, 0, 0);
+}
+function buildModelButtons() {
+  const hostB = document.getElementById('model-build');
+  const hostT = document.getElementById('model-tail');
+  hostB.innerHTML = '';
+  hostT.innerHTML = '';
+  for (const pair of MODEL_BUILDS) {
+    const b = document.createElement('button');
+    b.textContent = pair[1];
+    b.classList.toggle('active', modelOpts.build === pair[0]);
+    b.onclick = () => setModelOpts(pair[0], null);
+    hostB.appendChild(b);
+  }
+  for (const pair of MODEL_TAILS) {
+    const b = document.createElement('button');
+    b.textContent = pair[1];
+    b.classList.toggle('active', modelOpts.tail === pair[0]);
+    b.onclick = () => setModelOpts(null, pair[0]);
+    hostT.appendChild(b);
+  }
+}
+function setModelOpts(build, tail) {
+  if (build) modelOpts.build = build;
+  if (tail) modelOpts.tail = tail;
+  try { localStorage.setItem(LS_MODEL_OPTS, JSON.stringify(modelOpts)); } catch (e) {}
+  buildModelButtons();
+  renderModel();
+}
+function resetModelOpts() { setModelOpts('norm', 'up'); }
+// зонд приёмки (как window.__frame у витрины): опции/кадр модели видны извне, детерминизм для пиксельных диффов
+window.__knsModel = {
+  get opts() { return Object.assign({}, modelOpts); },
+  get frame() { return modelFrame; },
+  setFrame(k) { modelFrame = k; renderModel(); },
+  force(b, t) { if (b) modelOpts.build = b; if (t) modelOpts.tail = t; renderModel(); }
+};
 
 // ---------- категории (как в KNS: Основа / Шея и морда / Туловище / Лапы и хвост) ----------
 function slotAvailable(slot) {
@@ -542,7 +643,7 @@ function applyCode(raw) {
     if (arr.length) next[n] = arr;
   }
   if (blocks.length > 24) bad += blocks.length - 24;
-  state = next; layerSel = {};
+  state = next; layerSel = {}; resetModelOpts(); // импорт кода CatWar: телосложение/хвост — в дефолт (решение заказчицы)
   persist(); render(); buildCategories(); buildSlotPanel();
   if (bad) alert('Не удалось разобрать блоков: ' + bad + (blocks.length > 24 ? ' (в коде ' + blocks.length + ' блоков, слотов 24)' : ''));
   else if (seen) { document.getElementById('code-out').value = encodeCode(); }
@@ -570,7 +671,7 @@ function randomize() {
   for (const n of [15, 16, 17, 18]) if (next[n]) next[n][0].colour = baseCol;
   state = next; layerSel = {}; persist(); render(); buildCategories(); buildSlotPanel();
 }
-function resetAll() { state = DEFAULT_STATE(); persist(); render(); buildCategories(); buildSlotPanel(); }
+function resetAll() { state = DEFAULT_STATE(); persist(); resetModelOpts(); render(); renderModel(); buildCategories(); buildSlotPanel(); }
 function updateCodeBox() { document.getElementById('code-out').value = encodeCode(); }
 
 document.getElementById('btn-walk').onclick = () => setPose('walk');
@@ -597,10 +698,17 @@ try {
 } catch (e) {}
 if (!Object.keys(state).length) state = DEFAULT_STATE();
 try { const p = localStorage.getItem(LS_POSE); if (p === 'sit' || p === 'walk') pose = p; } catch (e) {}
+try {
+  const mo = JSON.parse(localStorage.getItem(LS_MODEL_OPTS) || 'null');
+  if (mo && (mo.build === 'norm' || mo.build === 'thin' || mo.build === 'chub')) modelOpts.build = mo.build;
+  if (mo && (mo.tail === 'up' || mo.tail === 'down')) modelOpts.tail = mo.tail;
+} catch (e) {}
 buildCategories();
 buildSlotPanel();
 updatePoseButtons();
+buildModelButtons();
 render();
+renderModel();
 if (pose === 'walk') startAnim();
 </script>
 </body>
