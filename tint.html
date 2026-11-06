@@ -5,6 +5,8 @@
 <title>Тонировка M2 — серые маски + 24 палитры дампа (этап 9)</title>
 <script src="catwar-manifest.js"></script>
 <script src="tint.js"></script>
+<script src="cat_h.js"></script>
+<script src="cat-scale.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { background: #efefef; font: 13px/1.4 Tahoma, Verdana, sans-serif; color: #222; margin: 0; padding: 8px; }
@@ -45,7 +47,7 @@ multiply(серая текстура) → destination-in(альфа маски) 
   </div>
 
   <div class="panel" style="text-align:center">
-    <canvas id="cat" width="240" height="360"></canvas>
+    <canvas id="cat" width="240" height="280"></canvas>
     <div class="legend" id="cur-info"></div>
   </div>
 
@@ -80,11 +82,12 @@ const LIVE_CODE = '1/18 17|5-16 14/2-8/18-9/2|4-13/14 18/15-8/18-9/2|4-13/14 31/
 
 const cv = document.getElementById('cat');
 const cctx = cv.getContext('2d');
-const ZOOM = 2.4;
 
 function drawOnce() {
-  // однотонный режим: colorId → hex; режим кода: coatState красит зоны по слотам
-  const opts = { build: build, scale: ZOOM };
+  // однотонный режим: colorId → hex; режим кода: coatState красит зоны по слотам.
+  // fit: кот ЛЮБОЙ позы/направления одной высоты TARGETS.tintDemo.T (s = T/catH,
+  // ноги на пол — единый масштаб, механизм витрины /archive)
+  const opts = { build: build, fit: 'tintDemo' };
   if (coatState) opts.state = coatState; else opts.solid = Tint.hexOf(0, colorId);
   opts.pose = pose; opts.dir = dir; opts.frame = frameIdx;
   const ok = Tint.render(cv, opts);

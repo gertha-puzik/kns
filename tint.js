@@ -207,6 +207,10 @@
     },
     isMirror: function (dir) { return String(dir || 'E').toUpperCase() === 'W'; },
     // главный вызов: state ИЛИ solid; при state({}) = дефолтный золотистый id 18
+    // o.fit — цель единых размеров: 'editorPair'/'tintDemo'/'framesStudio' (имя TARGETS
+    // в cat-scale.js) ИЛИ число T в px. Кот рисуется высотой T (s = T/catH, ноги на пол,
+    // силуэт по центру — механизм витрины /archive). Ассет без данных/битый (bad) →
+    // старое поведение: равномерный o.scale по кадру.
     render: function (canvasEl, opts) {
       const o = opts || {};
       const build = o.build || 'norm';
@@ -216,9 +220,17 @@
       const c = renderFrame(build, key, state, solid);
       if (!c) return false;
       const t = canvasEl.getContext('2d');
-      const scale = o.scale || 1;
       t.imageSmoothingEnabled = false;
       t.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      if (o.fit && typeof KNS_CAT_SCALE !== 'undefined') {
+        const ref = 'gray/' + build + '/' + key;
+        const Tn = (typeof o.fit === 'number') ? o.fit
+                 : (KNS_CAT_SCALE.TARGETS[o.fit] ? KNS_CAT_SCALE.TARGETS[o.fit].T : null);
+        const f = Tn ? KNS_CAT_SCALE.drawFitted(t, canvasEl, c, ref, Tn, api.isMirror(o.dir)) : null;
+        if (f) return true;
+        // нет данных catH или кадр bad → рисуем по-старому (равный масштаб кадра)
+      }
+      const scale = o.scale || 1;
       t.save();
       t.scale(scale, scale);
       if (api.isMirror(o.dir)) { t.translate(W, 0); t.scale(-1, 1); } // W = зеркало E (файлы-зеркала не хранят дублем)
