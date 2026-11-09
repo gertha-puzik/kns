@@ -121,6 +121,7 @@
     <div class="status" id="status">Выбери режим боя</div>
     <button class="btn ghost" id="btnRedraw">⟲ пере-рисовать <span style="opacity:.6">[R]</span></button>
     <button class="btn ghost" id="btnSound" title="звук вкл/выкл">🔊</button>
+    <button class="btn primary" id="btnGo" hidden>в бой ▶ <span style="opacity:.6">[Enter]</span></button>
     <button class="btn ghost" id="btnMenu">в меню</button>
   </div>
 
@@ -170,7 +171,23 @@ const WALK_MS=280;
 const BASE_HP=3;
 const EPS=0.05;
 const SYNC_MS=25, PARRY_WIN=115;   // timing: окно синхро-клинча | окно парирования (кто раньше — тот продавил)
-function flightDur(A,B){ return clamp(Math.max(A.total,B.total)/0.52, 620, 2500); } // ~520 px/s на длиннейшей дуге
+const BASE_SPEED=0.52;            // px/мс — скорость лапы каждого игрока (индивидуальная)
+function flightDur(A,B){ return clamp(Math.max(A.total,B.total)/BASE_SPEED, 620, 3400); } // общий масштаб размаха раунда
+
+/* зоны кота [X-идея]: морда = крит −2, корпус = −1, хвост = фол (−1 жертве + берсерк) */
+function zoneCenter(catIdx, kind){
+  const c=catCenter(catIdx), dir=(catIdx===0?1:-1);   // A(кадры E) смотрит вправо, B(W) — влево
+  if(kind==='head') return {x:c.x+dir*58, y:c.y-56, rx:40, ry:34, kind};
+  if(kind==='tail') return {x:c.x-dir*72, y:c.y+44, rx:44, ry:28, kind};
+  return {x:c.x, y:c.y, rx:ZONE_RX, ry:ZONE_RY, kind:'body'};
+}
+function inEll(p, z){ const dx=(p.x-z.x)/z.rx, dy=(p.y-z.y)/z.ry; return dx*dx+dy*dy<=1; }
+function hitZoneKind(p, catIdx){
+  if(inEll(p, zoneCenter(catIdx,'head'))) return 'head';
+  if(inEll(p, zoneCenter(catIdx,'tail'))) return 'tail';
+  if(inEll(p, zoneCenter(catIdx,'body'))) return 'body';
+  return null;
+}
 
 /* ═══════════════ УТИЛИТЫ ═══════════════ */
 const $=id=>document.getElementById(id);
@@ -277,53 +294,80 @@ function crossingsOf(A,B){
   return res;
 }
 function catCenter(i){ return {x:CATX[i], y:FLOOR-ZONE_CY_OFF}; }
-function inHitZone(p, catIdx){
-  const c=catCenter(catIdx), dx=(p.x-c.x)/ZONE_RX, dy=(p.y-c.y)/ZONE_RY;
-  return dx*dx+dy*dy<=1;
-}
 
 /* ═══════════════ РАЗРЕШЕНИЕ РАУНДА (чистая функция) ═══════════════ */
 /* mode 'any'    — по ТЗ: любое геометрическое пересечение траекторий = блок
-   mode 'timing' — блок это «одновременная встреча лап» с точностью до окна:
-                   пересечение ∩ |Δприлёта| ≤ PARRY_WIN → клинч;
+   mode 'timing' — блок это «одновременная встреча лап», у каждого своя скорость (BASE_SPEED *= модификаторы):
+                   пересечение ∩ |Δприлёта| ≤ окна → клинч;
                    Δ ≤ SYNC_MS       → синхро-клинч: оба сбиты (идеальный лязг);
-                   SYNC_MS < Δ ≤ WIN → ПАРИРОВАНИЕ: кто пришёл в точку раньше —
-                   продавил и доезжает до конца (может и попасть), опоздавший сбит;
-                   Δ > WIN           → разминовка: обе лапы проскочили точку порознь */
-function resolveRound(A,B,mode){
+                   SYNC_MS < Δ ≤ WIN → ПАРИРОВАНИЕ: ранний продавил и доезжает;
+                   Δ > WIN           → разминовка.
+   opts (собирается из состояния матча):
+     lazy[i]  — «вялая лапа»: −25% скорости (анти-спам клинчей, третий sync подряд)
+     rage[i]  — «бесится» (наступили на хвост): +15% скорости на один раунд
+     desperate[i] — «девятая жизнь»: у кота с 1 рыбкой окно парира шире на 25%,
+                     и опоздав в (WIN, WIN*1.25] он всё равно продавливает
+     sudden   — sudden death при 1:1: блоков нет вообще, только чистые хиты */
+function playerSpeed(i, opts){
+  let sp=BASE_SPEED;
+  if(opts&&opts.lazy&&opts.lazy[i]) sp*=0.75;
+  if(opts&&opts.rage&&opts.rage[i]) sp*=1.15;
+  return sp;
+}
+function hitsResult(A, B){
+  const endA=A.at(1), endB=B.at(1);
+  const zoneA=hitZoneKind(endA,1), zoneB=hitZoneKind(endB,0);
+  return {type:'hits', endA, endB,
+    hitA:zoneA!=null, zoneA, hitB:zoneB!=null, zoneB};
+}
+function matchOpts(){
+  return {lazy:S.lazy&&S.lazy.slice(), rage:S.rage&&S.rage.slice(), sudden:!!S.sudden,
+          desperate:[S.hp[0]===1, S.hp[1]===1]};
+}
+function resolveRound(A,B,mode,opts){
   mode=mode||(S.clinchMode||'any');
-  if(mode==='timing') return resolveTiming(A,B);
+  opts=opts||matchOpts();
+  if(mode==='timing') return resolveTiming(A,B,opts);
   const xs=crossingsOf(A,B);
   if(xs.length){
     let best=xs[0];
     for(const c of xs) if(Math.max(c.sA,c.sB)<Math.max(best.sA,best.sB)) best=c;
     return {type:'clinch', x:best.pt, sA:best.sA, sB:best.sB};
   }
-  const endA=A.at(1), endB=B.at(1);
-  return {type:'hits', hitA:inHitZone(endA,1), hitB:inHitZone(endB,0), endA, endB};
+  return hitsResult(A,B);
 }
-function resolveTiming(A,B){
-  const dur=flightDur(A,B);
+function resolveTiming(A,B,opts){
+  opts=opts||{};
+  const durA=clamp(A.total/playerSpeed(0,opts), 620, 3400);
+  const durB=clamp(B.total/playerSpeed(1,opts), 620, 3400);
+  if(opts.sudden) return Object.assign(hitsResult(A,B), {sudden:true});   // без блоков
   let ev=null;
   for(const c of crossingsOf(A,B)){
-    const tA=c.sA*dur, tB=c.sB*dur, d=Math.abs(tA-tB);
-    if(d>PARRY_WIN) continue;                       // лапы у точки порознь — разминовка
+    const tA=c.sA*durA, tB=c.sB*durB, d=Math.abs(tA-tB);
+    if(d>PARRY_WIN*1.25) continue;                 // заведомо мимо любых окон
     const tc=Math.max(tA,tB);
     if(!ev||tc<ev.tc) ev={pt:c.pt, sA:c.sA, sB:c.sB, tA, tB, d, tc};
   }
   if(ev){
     const early=ev.tA<=ev.tB?0:1, late=1-early;
-    const endW=(early===0?A:B).at(1);
-    const hitW=(early===0)?inHitZone(endW,1):inHitZone(endW,0);
-    return {type:'clinch',
-      kind: ev.d<=SYNC_MS?'sync':'parry',
-      winner: ev.d<=SYNC_MS?-1:(ev.tA<=ev.tB?0:1), loser: late,
-      deltaMs: ev.d,
-      x:ev.pt, sA:ev.sA, sB:ev.sB,
-      endW, hitW };
+    const desperateLate=opts.desperate&&opts.desperate[late];
+    let kind, winner;
+    if(ev.d<=SYNC_MS){ kind='sync'; winner=-1; }
+    else {
+      kind='parry';
+      if(ev.d<=PARRY_WIN) winner=early;                       // обычное пари
+      else if(desperateLate){ winner=late; ev.nine=true; }    // девятая жизнь: бесится и продавливает
+      else { ev=null; }                                       // разминовка
+    }
+    if(ev){
+      const endW=(winner===0?A:B).at(1);
+      const zoneW=winner===0?hitZoneKind(endW,1):hitZoneKind(endW,0);
+      return {type:'clinch', kind, winner, loser:kind==='parry'?1-winner:-1,
+        deltaMs:ev.d, nine:!!ev.nine, tA:ev.tA, tB:ev.tB,
+        x:ev.pt, sA:ev.sA, sB:ev.sB, endW, hitW:zoneW!=null, zoneW};
+    }
   }
-  const endA=A.at(1), endB=B.at(1);
-  return {type:'hits', hitA:inHitZone(endA,1), hitB:inHitZone(endB,0), endA, endB};
+  return hitsResult(A,B);
 }
 
 /* ═══════════════ СОСТОЯНИЕ ═══════════════ */
@@ -335,7 +379,14 @@ const S={
   round:1,
   drawingPlayer:0,
   live:[],
-  trajs:[null,null],
+  trajs:[null,null],        // main-удары
+  slots:[null,null],        // {main:traj, feint:traj|null} — два мазка: удар + финт-фантом
+  ghosts:[],                // призраки прошлых раундов: [{A:traj,B:traj}] (макс. 3)
+  lazy:null,                // «виляпы» [bool,bool] — анти-спам: 3 синхро-клинча подряд
+  rage:null,                // «бесится» [bool,bool] — наступили на хвост: +15% скорости на раунд
+  syncStreak:0,
+  sudden:false,             // sudden death при 1:1: раунд без блоков
+  postmor:false,            // режим пост-мортема на итоговой схеме
   pb:null,
   particles:[], floats:[], flashes:[],
   catAmp:[.1,.1], knock:[0,0], squash:[0,0], freeze:null, shake:null, clashAt:0,
@@ -414,16 +465,20 @@ function screenLobby(){
       <button class="btn" id="btnBot">🤖 против кота-бота</button>
     </div>
     <div class="rules-lobby">
-      <b>Правила:</b> каждый рисует мышкой траекторию удара по чужому коту.
-      Траектории <b>пересеклись</b> — блок. <b>Не пересеклись</b> — если конец дошёл до кота, ему −1 🐟.
-      Три рыбки на кота. Точки на мазке — метки времени полёта (каждые +100 мс).
+      <b>Правила:</b> каждый рисует мышкой траекторию удара по чужому коту — <b>удар</b> + опциональный
+      <b>финт-фантом 👻</b> (враг не знает, какой из двух настоящий).
+      Траектории <b>пересеклись</b> — блок. <b>Не пересеклись</b> — если конец дошёл до кота, минус рыбка.
+      <b>Зоны:</b> морда = КРИТ −2 🐟, корпус −1, хвост = ФОЛ — минус, но жертва <b>бесится</b> (+15% скорости на раунд).
+      Три рыбки на кота. На последней рыбке клинч-окно шире — <b>«девятая жизнь»</b>.
+      При 1:1 — <b>внезапная смерть</b>: раунд без блоков. Точки на мазке — метки времени полёта (+100 мс).
     </div>
     <div class="mode-select">
       <label><input type="radio" name="cMode" value="any" checked>
         <b>по ТЗ:</b> любая пересечёнка = блок</label>
       <label><input type="radio" name="cMode" value="timing">
         <b>тайминг:</b> блок только если лапы бьют одновременно
-        <span class="mode-note">длина замаха = когда прилетишь; в клинче побеждает тот, кто оказался в точке раньше — продавил и доезжает. Идеально синхронно (Δ&lt;25 мс) — лязг, оба сбиты</span></label>
+        <span class="mode-note">длина замаха = когда прилетишь (у каждого своя скорость); в клинче побеждает тот, кто оказался в точке раньше —
+        продавил и доезжает. Идеально синхронно (Δ&lt;25 мс) — лязг, оба сбиты. Третий лязг подряд — у обоих лапы <b>вялые</b> (−25% скорости)</span></label>
     </div>
     <div class="small"><a id="btnSelftest">прогнать самотест (гейты механики)</a></div>
   </div>`);
@@ -452,17 +507,26 @@ function startMatch(mode){
   S.winner=-1; S.doubleKO=false; S.lastRes=null;
   const cm=document.querySelector('input[name=cMode]:checked');
   S.clinchMode=cm?cm.value:'any';
-  S.trajs=[null,null]; S.live=[]; S.particles=[]; S.floats=[]; S.flashes=[]; S.pb=null;
+  S.trajs=[null,null]; S.slots=[null,null]; S.live=[];
+  S.ghosts=[]; S.lazy=null; S.rage=null; S.syncStreak=0; S.sudden=false; S.postmor=false;
+  S.particles=[]; S.floats=[]; S.flashes=[]; S.pb=null;
   syncHp(); showOvl(null);
   beginDraw(0);
 }
 function beginDraw(player){
   S.phase='draw'; S.drawingPlayer=player;
-  S.trajs[player]=null; S.live=[];
+  S.trajs=[null,null]; S.slots=[null,null]; S.live=[]; S.postmor=false;
   cv.className='drawing';
+  $('btnGo').hidden=true;
+  /* sudden death: при 1:1 − раунд без блоков [Я-идея] */
+  if(S.hp[0]===1&&S.hp[1]===1&&!S.sudden){
+    S.sudden=true; sfx.sting();
+  }
   const [na,nb]=names();
-  status(`<b>${player?nb:na}</b>, рисуй мышкой траекторию удара по <b>${player?na:nb}</b>`);
-  banner(`РАУНД ${S.round}`, 900);
+  status(`<b>${player?nb:na}</b>, рисуй мышкой траекторию удара по <b>${player?na:nb}</b>`+
+    (S.sudden?`<br><b style="color:#ff3a00">SUDDEN DEATH — блоков нет, только чистые попадания!</b>`:''));
+  banner(S.sudden?'SUDDEN DEATH!':`РАУНД ${S.round}`, S.sudden?1600:900);
+  if(S.sudden) sfx.sting();
   turnMarks();
   render(performance.now());   // опорный кадр (страховка от замёрзшего rAF)
 }
@@ -492,24 +556,36 @@ function screenResult(r){
   banner(null);
   const [na,nb]=names();
   let title, sub;
+  const zoneTag=(z)=>z==='head'?' — КРИТ ПО МОРДЕ, −2 🐟!':(z==='tail'?' — ФОЛ: наступил на хвост! Жертва бесится 🔥':'');
   if(r.type==='clinch'){
-    if(r.kind==='sync'){ title='СИНХРО-КЛИНЧ! БЛОК'; sub=`Δ ${Math.round(r.deltaMs)} мс — идеальный лязг: оба удара сбиты`; }
+    if(r.kind==='sync'){
+      title='СИНХРО-КЛИНЧ! БЛОК';
+      sub=`Δ ${Math.round(r.deltaMs)} мс — идеальный лязг: оба удара сбиты`;
+      if(S.syncStreak>=3) sub=`Δ ${Math.round(r.deltaMs)} мс — 3-й клинч подряд: у обоих ВЯЛЫЕ ЛАПЫ (−25% скорости)`;
+    }
     else if(r.kind==='parry'){
-      const wn=names()[r.winner];
-      if(r.hitW){ title=`${wn} ПАРИРОВАЛ И ПОДЪЕБАЛ!`; sub=`опередил на ${Math.round(r.deltaMs)} мс — удар продавил, минус рыбка`; }
+      const wn=names()[r.winner], ls=names()[1-r.winner];
+      if(r.nine){
+        title=`${wn} ПРОДАВИЛ ЧЕРЕЗ КЛИНЧ!`;
+        sub=`9-я жизнь: последняя рыбка — бесится от боли, Δ ${Math.round(r.deltaMs)} мс не помеха`;
+        if(r.hitW) sub+=` · ${zoneTag(r.zoneW)||' попал: минус рыбка'}`;
+      }
+      else if(r.hitW&&r.zoneW==='head'){ title=`${wn} ПАРИРОВАЛ И КРИТАНУЛ ПО МОРДЕ!`; sub=`пари +${Math.round(r.deltaMs)} мс · контр-крит: −2 🐟`; }
+      else if(r.hitW){ title=`${wn} ПАРИРОВАЛ И ПОДЪЕБАЛ!`; sub=`опередил на ${Math.round(r.deltaMs)} мс${zoneTag(r.zoneW)||' — удар продавил, минус рыбка'}`; }
       else { title=`${wn} ПАРИРОВАЛ!`; sub=`опередил на ${Math.round(r.deltaMs)} мс — вражеский удар сбит, но своего не хватило`; }
     }
     else { title='КЛИНЧ! БЛОК'; sub='траектории пересеклись — оба удара сбиты'; }
   }
-  else if(r.hitA&&r.hitB){ title='ОБМЕНЯЛИСЬ!'; sub='обе траектории дошли — каждому −1 🐟'; }
-  else if(r.hitA){ title=`${na} подъебал ${nb}!`; sub='удар дошёл — минус рыбка'; }
-  else if(r.hitB){ title=`${nb} подъебал ${na}!`; sub='удар дошёл — минус рыбка'; }
+  else if(r.hitA&&r.hitB){ title='ОБМЕНЯЛИСЬ!'; sub=`каждому −1 🐟 · урон пошёл по зонам`; }
+  else if(r.hitA){ title=`${na} подъебал ${nb}!`; sub=`удар дошёл${zoneTag(r.zoneA)||' — минус рыбка'}${r.zoneA==='tail'?' · ':''}`; if(r.zoneA==='tail') sub=`наступил на хвост: −1 🐟 и ${nb} бесится (+15% скорости)`; }
+  else if(r.hitB){ title=`${nb} подъебал ${na}!`; sub=`удар дошёл${zoneTag(r.zoneB)||' — минус рыбка'}${r.zoneB==='tail'?` · ${na} бесится (+15% скорости)`:''}`; }
   else { title='ОБА В МОЛОКО…'; sub='никто не попал. Стыдно, коты.'; }
+  if(S.sudden&&(r.type==='hits')) sub+=' · SUDDEN DEATH: блоков нет';
+  const diag=postmortemDiag(r);
   if(S.hp[0]<=0||S.hp[1]<=0){
     S.winner=(S.hp[0]<=0&&S.hp[1]<=0)?-1:(S.hp[1]<=0?0:1);
     S.doubleKO=(S.hp[0]<=0&&S.hp[1]<=0);
-    let gs;
-    let h2;
+    let h2, gs;
     if(S.doubleKO){ h2='ОБОЮДНЫЙ НОКАУТ'; gs='свалились оба — ничья!'; }
     else { h2=`${names()[S.winner]} ПОДЪЕБАЛ ${names()[1-S.winner]}`; gs='чемпион арены: все три рыбки сняты'; }
     S.phase='gameover';
@@ -522,12 +598,32 @@ function screenResult(r){
     $('rAgain').onclick=()=>startMatch(S.mode);
     $('rMenu').onclick=screenLobby;
   } else {
+    const diagHtml=S.postmor?`<div class="sub" style="font-family:ui-monospace,monospace; font-size:11.5px; color:#ffe25e">${diag}</div>`:'';
     showOvl(`<div class="panel mini"><h2>${title}</h2>
-      <div class="sub">${sub}</div>
-      <div class="btnrow"><button class="btn primary" id="rNext">следующий раунд ▶</button></div></div>`, true, true);
+      <div class="sub">${sub}</div>${diagHtml}
+      <div class="btnrow">
+        <button class="btn" id="rMortem">${S.postmor?'⟲ скрыть разбор':'🔍 пост-мортем'}</button>
+        <button class="btn primary" id="rNext">следующий раунд ▶</button>
+      </div></div>`, true, true);
+    $('rMortem').onclick=()=>{ S.postmor=!S.postmor; screenResult(r); render(performance.now()); };
     $('rNext').onclick=()=>{ S.round++; showOvl(null); beginDraw(0); };
   }
   syncHp(); turnMarks();
+}
+/* текст-диагноз для пост-мортем-панели [G ghost-offset адаптация] */
+function postmortemDiag(r){
+  if(!r) return '';
+  if(r.type==='clinch'){
+    if(r.kind==='parry'){
+      const d=Math.round(r.deltaMs), need=Math.max(1, d-PARRY_WIN+25);
+      const loser=names()[r.loser];
+      return `${loser} опоздал на ${d} мс. Продавил бы клинч, прилетев на ~${need} мс раньше (окно ≤${PARRY_WIN} мс, Δ≤${SYNC_MS} мс = лязг).`;
+    }
+    return `Идеальная синхронизация: лязг при Δ${Math.round(r.deltaMs)} мс. Три подряд — и лапы вялые.`;
+  }
+  const times=`прилёт: A за ${Math.round(clamp(S.trajs[0].total/BASE_SPEED,620,3400))} мс · B за ${Math.round(clamp(S.trajs[1].total/BASE_SPEED,620,3400))} мс`;
+  if(r.hitA||r.hitB) return `${times}. Длина замаха = время прилёта: короче дуга — раньше прилетишь.`;
+  return `${times}. Обе лапы мимо: дуги не дошли до зон.`;
 }
 
 /* ═══════════════ ВВОД ═══════════════ */
@@ -571,19 +667,50 @@ cv.addEventListener('pointerup', ()=>{
     banner('МАХНИ ШИРЕ!', 800);
     return;
   }
-  S.trajs[S.drawingPlayer]=traj;
-  finishDrawPhase();
+  const p=S.drawingPlayer;
+  if(!S.slots[p]) S.slots[p]={main:null, feint:null};
+  const slot=S.slots[p];
+  if(!slot.main){
+    slot.main=traj;
+    $('btnGo').hidden=false;                       // удар готов — можно сразу в бой
+    const [na,nb]=names();
+    status(`<b>${p?nb:na}</b>, удар принят (<b>${Math.round(traj.total)} px · полёт ~${Math.round(clamp(traj.total/BASE_SPEED,620,3400))} мс</b>).`+
+      ` Нарисуй <b>финт-фантом</b> (двойной блеф) — или жми <b>в бой</b>`);
+  } else {
+    slot.feint=traj;                               // второй мазок = финт (перезапись)
+    const [na,nb]=names();
+    status(`<b>${p?nb:na}</b>: удар + финт <span style="opacity:.7">👻</span> готовы. Жми <b>в бой</b>`);
+    banner('ФИНТ ГОТОВ 👻', 700);
+  }
+  render(performance.now());
 });
 cv.addEventListener('pointercancel', ()=>{ S.live=[]; });
 function redrawPath(){
   if(S.phase!=='draw') return;
-  S.trajs[S.drawingPlayer]=null; S.live=[];
+  const p=S.drawingPlayer, slot=S.slots[p];
+  if(slot){
+    if(slot.feint) slot.feint=null;                // R сначала убирает финт
+    else { S.slots[p]=null; $('btnGo').hidden=true; }
+  } else $('btnGo').hidden=true;
+  S.live=[];
   const [na,nb]=names();
-  status(`<b>${S.drawingPlayer?nb:na}</b>, рисуй заново`);
+  status(`<b>${p?nb:na}</b>, рисуй заново`);
+  render(performance.now());
 }
+function commitDrawPhase(){
+  if(S.phase!=='draw') return;
+  const p=S.drawingPlayer, slot=S.slots[p];
+  if(!slot||!slot.main){ banner('СНАЧАЛА НАРИСУЙ УДАР!', 900); return; }
+  S.trajs[p]=slot.main;
+  finishDrawPhase();
+}
+$('btnGo').onclick=commitDrawPhase;
 document.addEventListener('keydown', ev=>{
   if(ev.target.tagName==='INPUT') return;
   if(ev.code==='KeyR') redrawPath();
+  if(ev.code==='Enter'||ev.code==='NumpadEnter'){
+    if(S.phase==='draw'){ ev.preventDefault(); commitDrawPhase(); }
+  }
 });
 $('btnRedraw').onclick=redrawPath;
 $('btnMenu').onclick=screenLobby;
@@ -594,6 +721,7 @@ function finishDrawPhase(){
     botThink();
     setTimeout(()=>{
       S.trajs[1]=buildTraj(botPath());
+      S.slots[1]={main:S.trajs[1], feint:Math.random()<0.35?buildTraj(botPath(0.5)):null};   // бот иногда финтит
       const delay=420+Math.random()*350;
       startPlayback(performance.now()+delay);
       status('БОЙ!');
@@ -677,6 +805,10 @@ const sfx=(()=>{
     bam(){ tone(170,42,0.16,'sine',0.5); noise(0.09,0.35,700); },              // попадание: бам
     whiff(){ tone(880,240,0.22,'sine',0.11); },                                 // промах: свист вниз
     pop(){ tone(520,780,0.07,'sine',0.18); },                                    // рыбка слетела
+    crit(){ tone(760,320,0.18,'square',0.16); noise(0.1,0.3,1900,0.03); },      // крит по морде: мяу-йелп
+    foul(){ tone(200,520,0.09,'sine',0.2); tone(520,190,0.13,'sine',0.16,0.09); }, // хвост-фол: обиженный мяу
+    ghostPop(){ noise(0.09,0.22,1400); tone(620,240,0.1,'sine',0.08); },        // финт-фантом растворился
+    sting(){ tone(98,98,0.34,'sawtooth',0.16); tone(104,104,0.34,'sawtooth',0.10,0.02); }, // sudden death: тревога
     round(){ tone(392,392,0.1,'triangle',0.10); tone(523,523,0.1,'triangle',0.10,0.12); },
     fanfare(){ [440,554,659,880].forEach((f,i)=>tone(f,f,0.16,'triangle',0.14,i*0.11)); }
   };
@@ -686,91 +818,59 @@ $('btnSound').onclick=function(){ const on=sfx.toggle(); this.textContent=on?'�
 /* ═══════════════ ПРОИГРЫВАНИЕ ═══════════════ */
 function startPlayback(t0){
   const A=S.trajs[0], B=S.trajs[1];
-  const res=resolveRound(A,B);
-  const dur=flightDur(A,B); // ~520 px/s на длиннейшей дуге
-  const pb={t0, dur, res, done:false, clashed:0, after:0};
+  const opts=matchOpts();
+  const res=resolveRound(A,B,S.clinchMode,opts);
+  const vel=i=>playerSpeed(i,opts);
+  const durA=clamp(A.total/vel(0), 620, 3400);
+  const durB=clamp(B.total/vel(1), 620, 3400);
+  const feints=[S.slots[0]?S.slots[0].feint:null, S.slots[1]?S.slots[1].feint:null];
+  const fDur=[feints[0]?clamp(feints[0].total/vel(0),620,3400):0,
+              feints[1]?clamp(feints[1].total/vel(1),620,3400):0];
+  const durEnd=Math.max(durA,durB,fDur[0],fDur[1]);
+  const pb={t0, durA, durB, fDur, durEnd, res, feints, fDone:[false,false], done:false, clashed:0, after:0};
   S.pb=pb;
   S.phase='playback';
+  S.lazy=null; S.rage=null;   // одноразовые модификаторы скорости сгорели в резолве
   turnMarks();
-  const now=performance.now();
-  const delay=ms=>Math.max(0, t0+ms-now);
-  const mine=fn=>{ if(S.pb===pb) fn(); };
   sfx.round();
-  if(res.type==='clinch'){
-    const tc=Math.max(res.sA,res.sB)*dur;
-    setTimeout(()=>mine(()=>{
-      if(pb.clashed) return;
-      pb.clashed=performance.now();
-      S.clashAt=pb.clashed;
-      S.freeze={until:performance.now()+90, now:performance.now()};
-      S.shake={t0:performance.now(), dur:340, amp:9};
-      burst(res.x.x,res.x.y, res.kind==='sync'?26:34, ['#ffffff','#ffd27a','#f5a94b']);
-      if(res.kind==='sync'){
-        floatText('СИНХРО!', res.x.x, res.x.y-34);
-        banner('СИНХРО-КЛИНЧ! БЛОК', 1200);
-        sfx.clank();
-        S.catAmp[0]=1.15; S.catAmp[1]=1.15;
-      } else {
-        const wn=names()[res.winner];
-        floatText(`+${Math.round(res.deltaMs)} мс`, res.x.x, res.x.y-58);
-        floatText('ПАРИРОВАЛ!', res.x.x, res.x.y-34);
-        banner(`${wn.toUpperCase()} ПАРИРОВАЛ!`, 1200);
-        sfx.parry();
-        S.catAmp[res.winner]=0.6; S.knock[res.winner]=0.25;
-      }
-    }), delay(tc));
-    if(res.kind==='parry'){
-      // победитель доезжает: свой момент истины в конце своей дуги
-      setTimeout(()=>mine(()=>{
-        if(pb.after) return;
-        pb.after=performance.now();
-        if(res.hitW){
-          burst(res.endW.x,res.endW.y, 28, [PC[res.winner],'#ffffff','#ff3a00']);
-          floatText('БАМ!', res.endW.x, res.endW.y-62);
-          flash(res.endW.x,res.endW.y);
-          S.freeze={until:performance.now()+80, now:performance.now()};
-          S.shake={t0:performance.now(), dur:360, amp:11};
-          sfx.bam();
-        } else {
-          burst(res.endW.x,res.endW.y, 6, ['#9a9280','#c9c2b0']);
-          sfx.whiff();
-        }
-      }), delay(Math.max(tc+120, dur)));
-      setTimeout(()=>mine(()=>{ if(!pb.done){ pb.done=true; applyRound(res); } }), delay(Math.max(tc+120, dur)+820));
-    } else {
-      setTimeout(()=>mine(()=>{ if(!pb.done){ pb.done=true; applyRound(res); } }), delay(tc+680));
-    }
-  } else {
-    setTimeout(()=>mine(()=>{
-      if(pb.after) return;
-      pb.after=performance.now();
-      if(res.hitA){ burst(res.endA.x,res.endA.y, 24, [PC[0],'#ffffff','#ff3a00']); floatText('БАМ!', res.endA.x, res.endA.y-62); flash(res.endA.x,res.endA.y); }
-      else burst(res.endA.x,res.endA.y, 6, ['#9a9280','#c9c2b0']);
-      if(res.hitB){ burst(res.endB.x,res.endB.y, 24, [PC[1],'#ffffff','#4da3ff']); floatText('БАМ!', res.endB.x, res.endB.y-62); flash(res.endB.x,res.endB.y); }
-      else burst(res.endB.x,res.endB.y, 6, ['#9a9280','#c9c2b0']);
-      if(res.hitA||res.hitB){
-        S.freeze={until:performance.now()+80, now:performance.now()};
-        S.shake={t0:performance.now(), dur:380, amp:res.hitA&&res.hitB?14:11};
-        sfx.bam();
-      } else { sfx.whiff(); }
-      if(!res.hitA&&!res.hitB) floatText('вжух…', (res.endA.x+res.endB.x)/2, Math.min(res.endA.y,res.endB.y)-50);
-    }), delay(dur));
-    setTimeout(()=>mine(()=>{ if(!pb.done){ pb.done=true; applyRound(res); } }), delay(dur+820));
-  }
+  const now=performance.now();
+  const mine=fn=>{ if(S.pb===pb) fn(); };
+  /* страховка от замёрзшего rAF: финал применения исхода */
+  setTimeout(()=>mine(()=>{ if(!pb.done){ pb.done=true; applyRound(res); } }), Math.max(0, t0+durEnd+2400-now));
 }
 function applyRound(res){
+  /* урон по зонам: морда −2, корпус −1, хвост −1 + жертва «бесится» */
+  const zap=(victim, zone)=>{
+    const dmg=zone==='head'?2:1;
+    S.hp[victim]=Math.max(0, S.hp[victim]-dmg);
+    if(zone==='head') sfx.crit();
+    if(zone==='tail'){ S.rageNext=S.rageNext||[false,false]; S.rageNext[victim]=true; sfx.foul(); }
+    sfx.pop();
+    S.squash[victim]=1; S.catAmp[victim]=1.5; S.knock[victim]=1;
+    return dmg;
+  };
   if(res.type==='clinch'){
     S.catAmp[0]=Math.max(S.catAmp[0],.8); S.catAmp[1]=Math.max(S.catAmp[1],.8);
     S.knock[0]=.3; S.knock[1]=.3;
-    if(res.kind==='parry'&&res.hitW){
-      const victim=1-res.winner;
-      S.hp[victim]--; syncHp(); sfx.pop();
-      S.squash[victim]=1; S.catAmp[victim]=1.5; S.knock[victim]=1;
+    if(res.kind==='sync'){
+      S.syncStreak=(S.syncStreak||0)+1;
+      if(S.syncStreak>=3){ S.lazyNext=[true,true]; }        // анти-спам: лапы вялые [S]
+    } else {
+      S.syncStreak=0;
+      if(res.kind==='parry'&&res.hitW) zap(1-res.winner, res.zoneW||'body');
     }
   } else {
-    if(res.hitA){ S.hp[1]--; sfx.pop(); S.squash[1]=1; S.catAmp[1]=1.5; S.knock[1]=1; }
-    if(res.hitB){ S.hp[0]--; sfx.pop(); S.squash[0]=1; S.catAmp[0]=1.5; S.knock[0]=1; }
-    syncHp();
+    S.syncStreak=0;
+    if(res.hitA) zap(1, res.zoneA||'body');
+    if(res.hitB) zap(0, res.zoneB||'body');
+  }
+  /* перенос одноразовых дебаффов/баффов на следующий раунд */
+  if(S.lazyNext){ S.lazy=S.lazyNext; S.lazyNext=null; }
+  if(S.rageNext){ S.rage=S.rageNext; S.rageNext=null; }
+  /* призраки прошлых раундов [G]: max 3 */
+  if(S.trajs[0]&&S.trajs[1]){
+    S.ghosts.push({A:S.trajs[0], B:S.trajs[1]});
+    while(S.ghosts.length>3) S.ghosts.shift();
   }
   if(S.hp[0]<=0||S.hp[1]<=0) sfx.fanfare();
   screenResult(res);
@@ -780,8 +880,9 @@ function updatePlayback(now){
   const pb=S.pb;
   if(!pb||now<pb.t0) return;
   const t=now-pb.t0, res=pb.res;
+  /* события клинча: реальные времена прилёта каждой лапы */
   if(res.type==='clinch'){
-    const tc=Math.max(res.sA,res.sB)*pb.dur;
+    const tc=Math.max(res.tA,res.tB);
     if(!pb.clashed && t>=tc){
       pb.clashed=now;
       S.clashAt=now;
@@ -794,18 +895,20 @@ function updatePlayback(now){
         S.catAmp[0]=1.15; S.catAmp[1]=1.15;
       } else {
         const wn=names()[res.winner];
-        floatText(`+${Math.round(res.deltaMs)} мс`, res.x.x, res.x.y-58);
+        floatText(res.nine?'ДЕВЯТАЯ ЖИЗНЬ!':'+'+Math.round(res.deltaMs)+' мс', res.x.x, res.x.y-58);
         floatText('ПАРИРОВАЛ!', res.x.x, res.x.y-34);
-        banner(`${wn.toUpperCase()} ПАРИРОВАЛ!`, 1200); sfx.parry();
+        banner(res.nine?`${wn.toUpperCase()} ПРОДАВИЛ ЧЕРЕЗ КЛИНЧ! (9-я жизнь)`:`${wn.toUpperCase()} ПАРИРОВАЛ!`, 1300);
+        sfx.parry();
+        S.catAmp[res.winner]=0.6; S.knock[res.winner]=0.25;
       }
     }
     if(res.kind==='parry'){
-      const fin=Math.max(tc+120, pb.dur);
+      const fin=Math.max(tc+120, res.winner===0?pb.durA:pb.durB);
       if(pb.clashed && !pb.after && t>=fin){
         pb.after=now;
         if(res.hitW){
-          burst(res.endW.x,res.endW.y, 28, [PC[res.winner],'#ffffff','#ff3a00']);
-          floatText('БАМ!', res.endW.x, res.endW.y-62);
+          burst(res.endW.x,res.endW.y, res.zoneW==='head'?40:28, [PC[res.winner],'#ffffff','#ff3a00']);
+          floatText(res.zoneW==='head'?'КРИТ!':'БАМ!', res.endW.x, res.endW.y-62);
           flash(res.endW.x,res.endW.y);
           S.freeze={until:now+80, now}; S.shake={t0:now, dur:360, amp:11};
           sfx.bam();
@@ -814,19 +917,37 @@ function updatePlayback(now){
       if(pb.after && now-pb.after>820 && !pb.done){ pb.done=true; applyRound(res); }
     } else if(pb.clashed && now-pb.clashed>680 && !pb.done){ pb.done=true; applyRound(res); }
   } else {
-    if(!pb.after && t>=pb.dur){
+    if(!pb.after && t>=Math.max(pb.durA,pb.durB)){
       pb.after=now;
-      if(res.hitA){ burst(res.endA.x,res.endA.y, 24, [PC[0],'#ffffff','#ff3a00']); floatText('БАМ!', res.endA.x, res.endA.y-62); flash(res.endA.x,res.endA.y); }
-      else burst(res.endA.x,res.endA.y, 6, ['#9a9280','#c9c2b0']);
-      if(res.hitB){ burst(res.endB.x,res.endB.y, 24, [PC[1],'#ffffff','#4da3ff']); floatText('БАМ!', res.endB.x, res.endB.y-62); flash(res.endB.x,res.endB.y); }
-      else burst(res.endB.x,res.endB.y, 6, ['#9a9280','#c9c2b0']);
-      if(res.hitA||res.hitB){
-        S.freeze={until:now+80, now}; S.shake={t0:now, dur:380, amp:res.hitA&&res.hitB?14:11};
+      const endHit=(end, zone, col)=>{
+        if(zone){
+          burst(end.x,end.y, zone==='head'?38:24, [col,'#ffffff','#ffe25e']);
+          floatText(zone==='head'?'КРИТ −2!':(zone==='tail'?'ФОЛ: НА ХВОСТ!':'БАМ!'), end.x, end.y-62);
+          flash(end.x,end.y);
+          return true;
+        }
+        burst(end.x,end.y, 6, ['#9a9280','#c9c2b0']);
+        return false;
+      };
+      const hA=endHit(res.endA, res.zoneA, PC[0]);
+      const hB=endHit(res.endB, res.zoneB, PC[1]);
+      if(hA||hB){
+        S.freeze={until:now+80, now}; S.shake={t0:now, dur:380, amp:(hA&&hB)?14:11};
         sfx.bam();
-      } else { sfx.whiff(); }
-      if(!res.hitA&&!res.hitB) floatText('вжух…', (res.endA.x+res.endB.x)/2, Math.min(res.endA.y,res.endB.y)-50);
+      } else sfx.whiff();
+      if(!hA&&!hB) floatText('вжух…', (res.endA.x+res.endB.x)/2, Math.min(res.endA.y,res.endB.y)-50);
+      if(res.sudden) banner('SUDDEN DEATH: без блоков', 1100);
     }
     if(pb.after && now-pb.after>820 && !pb.done){ pb.done=true; applyRound(res); }
+  }
+  /* финт-фантомы: каждая доезжает до своего конца и растворяется облачком */
+  for(const i of [0,1]){
+    if(pb.feints[i] && !pb.fDone[i] && t>=pb.fDur[i]){
+      pb.fDone[i]=true;
+      const e=pb.feints[i].at(1);
+      burst(e.x,e.y, 12, ['#d9d4c8','#ffffff','#9a9280']);
+      sfx.ghostPop();
+    }
   }
 }
 /* лапа летит по своей кривой; при клинче упирается в чужую траекторию и стоит */
@@ -924,6 +1045,18 @@ function drawZoneHint(player, now){
   ctx.beginPath();
   ctx.ellipse(c.x, c.y, ZONE_RX, ZONE_RY, 0, 0, Math.PI*2);
   ctx.stroke();
+  /* пометки зон [X]: морда КРИТ −2 / хвост ФОЛ (жертва бесится) */
+  ctx.globalAlpha=0.5;
+  ctx.setLineDash([]);
+  ctx.lineWidth=1.5;
+  ctx.font='700 10px system-ui';
+  ctx.textAlign='center';
+  const h=zoneCenter(foe,'head'), t=zoneCenter(foe,'tail');
+  ctx.strokeStyle='#ffe25e'; ctx.fillText('КРИТ −2', h.x, h.y-12);
+  ctx.beginPath(); ctx.ellipse(h.x,h.y,h.rx,h.ry,0,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='#b78cff';
+  ctx.fillText('ФОЛ', t.x, t.y-10);
+  ctx.beginPath(); ctx.ellipse(t.x,t.y,t.rx,t.ry,0,0,Math.PI*2); ctx.stroke();
   ctx.restore();
 }
 /* метки времени полёта: точка каждые 100 мс (крупнее каждые 500) */
@@ -965,55 +1098,73 @@ function render(now){
   /* коты */
   drawCat(0, now); drawCat(1, now);
 
-  /* траектории по фазам */
-  if(S.phase==='draw'&&S.live.length>1){
+  /* призраки прошлых раундов [G]: блеклые подсказки «он в прошлый раз махал так» */
+  for(const g of S.ghosts){
+    strokeLine(g.A.pts, PC[0], 0.10, 3);
+    strokeLine(g.B.pts, PC[1], 0.10, 3);
+  }
+
+  /* draw-фаза: зоны врага + принятые мазки + живой мазок */
+  if(S.phase==='draw'){
     drawZoneHint(S.drawingPlayer, now);
-    const liveTraj=buildTraj(S.live);
-    drawTimeTicks(liveTraj, PC[S.drawingPlayer], 0.8);
-    strokeLine(S.live, PC[S.drawingPlayer], 0.95, 7);
-  } else if(S.phase==='draw'){
-    drawZoneHint(S.drawingPlayer, now);
+    const slot=S.slots[S.drawingPlayer];
+    if(slot&&slot.main){
+      strokeLine(slot.main.pts, PC[S.drawingPlayer], 0.75, 5, true);
+      drawTimeTicks(slot.main, '#f5c76a', 0.6, clamp(slot.main.total/BASE_SPEED,620,3400));
+      if(slot.feint){   /* свой финт виден автору: пунктир (в playback обе лапы одинаковы — враг не отличит) */
+        ctx.save();
+        ctx.setLineDash([12,9]);
+        strokeLine(slot.feint.pts, PC[S.drawingPlayer], 0.45, 4, true);
+        ctx.restore();
+      }
+    }
+    if(S.live.length>1){
+      const liveTraj=buildTraj(S.live);
+      drawTimeTicks(liveTraj, PC[S.drawingPlayer], 0.8);
+      strokeLine(S.live, PC[S.drawingPlayer], 0.95, 7);
+    }
   }
 
   if(S.phase==='playback'&&S.pb&&S.trajs[0]&&S.trajs[1]){
     const pb=S.pb, res=pb.res;
-    const t=clamp((now-pb.t0)/pb.dur, 0, 1.2);
-    strokeLine(S.trajs[0].pts, PC[0], 0.20, 5);
-    strokeLine(S.trajs[1].pts, PC[1], 0.20, 5);
-    drawTimeTicks(S.trajs[0], '#f5f2e8', 0.30, pb.dur);
-    drawTimeTicks(S.trajs[1], '#f5f2e8', 0.30, pb.dur);
-    let pa=t, pbp=t, fadeA=1, fadeB=1;
+    const t=now-pb.t0;
+    const anon=t<300;                     /* частичное вскрытие [S]: первые 300 мс линии анонимны */
+    const C0=anon?'#8a8a8a':PC[0], C1=anon?'#8a8a8a':PC[1];
+    strokeLine(S.trajs[0].pts, C0, 0.20, 5);
+    strokeLine(S.trajs[1].pts, C1, 0.20, 5);
+    drawTimeTicks(S.trajs[0], '#f5f2e8', 0.30, pb.durA);
+    drawTimeTicks(S.trajs[1], '#f5f2e8', 0.30, pb.durB);
+    let progA=clamp(t/pb.durA,0,1.05), progB=clamp(t/pb.durB,0,1.05);
+    let fadeA=1, fadeB=1;
     if(res.type==='clinch'){
       if(res.kind==='parry'){
-        // опоздавший сбит и гаснет у точки, победитель доезжает до конца
-        if(res.winner===0){ pa=Math.min(t,res.sA); fadeA=1; pbp=Math.min(t,res.sB); fadeB=pawFade(now); }
-        else { pbp=Math.min(t,res.sB); fadeB=1; pa=Math.min(t,res.sA); fadeA=pawFade(now); }
+        /* победитель продавил и доезжает, сбитый гаснет у точки клинча */
+        if(res.winner===0){ progB=Math.min(progB,res.sB); fadeB=pawFade(now); }
+        else { progA=Math.min(progA,res.sA); fadeA=pawFade(now); }
       } else {
-        pa=Math.min(t,res.sA); pbp=Math.min(t,res.sB);
+        progA=Math.min(progA,res.sA); progB=Math.min(progB,res.sB);
         fadeA=pawFade(now); fadeB=fadeA;
       }
     }
-    strokeTrajPart(S.trajs[0], pa, PC[0], 0.85, 6.5);
-    strokeTrajPart(S.trajs[1], pbp, PC[1], 0.85, 6.5);
-    drawPaw(S.trajs[0], pa, PC[0], fadeA);
-    drawPaw(S.trajs[1], pbp, PC[1], fadeB);
+    strokeTrajPart(S.trajs[0], progA, C0, 0.85, 6.5);
+    strokeTrajPart(S.trajs[1], progB, C1, 0.85, 6.5);
+    drawPaw(S.trajs[0], progA, C0, fadeA);
+    drawPaw(S.trajs[1], progB, C1, fadeB);
+    /* финт-фантомы летят как вторые лапы — враг не знает, какая из двух настоящая [S] */
+    for(const i of [0,1]){
+      if(!pb.feints[i]) continue;
+      const progF=clamp(t/pb.fDur[i],0,1);
+      const CF=anon?'#8a8a8a':PC[i];
+      if(pb.fDone[i]) continue;              // растворился облачком — дальше не рисуем
+      strokeTrajPart(pb.feints[i], progF, CF, 0.85, 6.5);
+      drawPaw(pb.feints[i], progF, CF, 1);
+    }
+    hudRace(now);                            /* мини-таймлайны прилёта [G] */
   }
 
   if((S.phase==='result'||S.phase==='gameover')&&S.trajs[0]&&S.trajs[1]){
-    /* итоговая схема раунда (читаемая, с белой подложкой + метки времени) */
-    const fdur=flightDur(S.trajs[0],S.trajs[1]);
-    strokeLine(S.trajs[0].pts, PC[0], 0.55, 5, true);
-    strokeLine(S.trajs[1].pts, PC[1], 0.55, 5, true);
-    drawTimeTicks(S.trajs[0], '#f5c76a', 0.75, fdur);
-    drawTimeTicks(S.trajs[1], '#f5c76a', 0.75, fdur);
-    const r=S.lastRes;
-    if(r){
-      if(r.type==='clinch') drawCrossMark(r.x.x, r.x.y, now);
-      else {
-        if(r.hitA) drawCrossMark(r.endA.x, r.endA.y, now);
-        if(r.hitB) drawCrossMark(r.endB.x, r.endB.y, now);
-      }
-    }
+    if(S.postmor) drawPostmortem();
+    else drawResultScheme();
   }
 
   /* эффекты */
@@ -1072,6 +1223,130 @@ function drawCrossMark(x,y,now){
   ctx.stroke();
   ctx.strokeStyle='#f5a94b'; ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+/* итоговая схема раунда: читаемая, белая подложка + метки времени */
+function drawResultScheme(){
+  const now=performance.now();
+  const dA=clamp(S.trajs[0].total/BASE_SPEED,620,3400);
+  const dB=clamp(S.trajs[1].total/BASE_SPEED,620,3400);
+  strokeLine(S.trajs[0].pts, PC[0], 0.55, 5, true);
+  strokeLine(S.trajs[1].pts, PC[1], 0.55, 5, true);
+  drawTimeTicks(S.trajs[0], '#f5c76a', 0.75, dA);
+  drawTimeTicks(S.trajs[1], '#f5c76a', 0.75, dB);
+  const r=S.lastRes;
+  if(!r) return;
+  if(r.type==='clinch') drawCrossMark(r.x.x, r.x.y, now);
+  else {
+    if(r.hitA) drawCrossMark(r.endA.x, r.endA.y, now);
+    if(r.hitB) drawCrossMark(r.endB.x, r.endB.y, now);
+  }
+}
+/* пост-мортем [G]: расшифровка раунда — победитель/проигравший, времена прилёта, фантомы, зоны */
+function drawPostmortem(){
+  const dA=clamp(S.trajs[0].total/BASE_SPEED,620,3400);
+  const dB=clamp(S.trajs[1].total/BASE_SPEED,620,3400);
+  const r=S.lastRes;
+  const colW='#ffe25e', colL='rgba(224,86,86,0.55)';
+  let wA=false;
+  if(r&&r.type==='clinch'&&r.kind==='parry') wA=(r.winner===0);
+  else if(r&&r.type==='hits') wA=(r.hitA&&!r.hitB);
+  if(r&&r.type==='clinch'){
+    /* победитель — яркая жёлтая, проигравший — полупрозрачный пунктир */
+    for(const [p, isW] of [[0,wA],[1,!wA]]){
+      const T=S.trajs[p];
+      ctx.save();
+      if(isW) strokeLine(T.pts, colW, 0.95, 6, true);
+      else { ctx.setLineDash([8,8]); strokeLine(T.pts, colL, 0.8, 4, true); }
+      ctx.restore();
+    }
+    /* расшифровка у точки: кто когда прилетел и на сколько пари */
+    ctx.save();
+    ctx.globalAlpha=0.95;
+    ctx.font='700 12px ui-monospace,monospace';
+    ctx.textAlign='center';
+    ctx.fillStyle='#17181b';
+    const x=r.x.x, y=r.x.y;
+    const line1=`A@${Math.round(dA*r.sA)}мс · B@${Math.round(dB*r.sB)}мс · Δ${Math.round(r.deltaMs)}мс`;
+    ctx.lineWidth=3.5; ctx.strokeStyle='#f5f2e8';
+    ctx.strokeText(line1, x, y-46); ctx.fillStyle='#ffe25e'; ctx.fillText(line1, x, y-46);
+    if(r.kind==='parry'){
+      const line2=r.nine?`${names()[r.winner]}: 9-я жизнь — продавил сквозь клинч!`:`${names()[r.winner]} продавил: ${names()[1-r.winner]} опоздал на ${Math.round(r.deltaMs)} мс`;
+      ctx.strokeText(line2, x, y-30); ctx.fillStyle='#fff'; ctx.fillText(line2, x, y-30);
+    } else {
+      ctx.strokeText('идеальный лязг', x, y-30); ctx.fillStyle='#fff'; ctx.fillText('идеальный лязг', x, y-30);
+    }
+    ctx.restore();
+    drawCrossMark(r.x.x, r.x.y, 0);
+  } else if(r){
+    for(const p of [0,1]){
+      const T=S.trajs[p];
+      const end=T.at(1);
+      const zone=p===0?r.zoneA:r.zoneB;
+      const isW=p===0?wA:!wA;
+      ctx.save();
+      if(zone){
+        if(isW){ strokeLine(T.pts, colW, 0.95, 6, true); }
+        else { ctx.setLineDash([8,8]); strokeLine(T.pts, colL, 0.8, 4, true); }
+        ctx.font='700 14px system-ui'; ctx.textAlign='center';
+        const label=zone==='head'?'КРИТ −2':(zone==='tail'?'ФОЛ':'−1 🐟');
+        ctx.lineWidth=3.5; ctx.strokeStyle='#f5f2e8'; ctx.fillStyle=zone==='head'?'#ffe25e':'#fff';
+        ctx.strokeText(label, end.x, end.y-38); ctx.fillText(label, end.x, end.y-38);
+      } else {
+        ctx.setLineDash([5,7]); strokeLine(T.pts, 'rgba(154,146,128,0.6)', 0.6, 3.5, true);
+      }
+      ctx.restore();
+    }
+  }
+  /* фантомы в пост-мортеме раскрыты */
+  ctx.save();
+  ctx.setLineDash([4,7]);
+  const slots=[S.slots[0], S.slots[1]];
+  for(const i of [0,1]){
+    const f=slots[i]?slots[i].feint:null;
+    if(!f) continue;
+    strokeLine(f.pts, 'rgba(138,138,138,0.55)', 0.7, 3.5, true);
+    const e=f.at(1);
+    ctx.font='700 10px system-ui'; ctx.textAlign='center'; ctx.fillStyle='rgba(230,230,220,0.8)';
+    ctx.fillText('финт 👻', e.x, e.y-14);
+  }
+  ctx.restore();
+  /* зоны котов в пост-мортеме подписаны явно */
+  ctx.save();
+  ctx.globalAlpha=0.55;
+  ctx.font='700 10px system-ui'; ctx.textAlign='center';
+  for(const cat of [0,1]){
+    const h=zoneCenter(cat,'head'), t=zoneCenter(cat,'tail');
+    ctx.fillStyle='#ffe25e'; ctx.fillText('КРИТ −2', h.x, h.y-12);
+    ctx.fillStyle='#b78cff'; ctx.fillText('ФОЛ: −1 + berserk', t.x, t.y-10);
+  }
+  ctx.restore();
+}
+/* HUD-гонка [G]: два мини-таймлайна «когда прилетит лапа» */
+function hudRace(now){
+  const pb=S.pb;
+  if(!pb) return;
+  const t=Math.max(0, now-pb.t0);
+  ctx.save();
+  ctx.font='700 10px ui-monospace,monospace';
+  ctx.textAlign='left';
+  const draw=(i, dur)=>{
+    const x=W-176, y=58+i*17, w=120;
+    ctx.globalAlpha=0.85;
+    ctx.fillStyle='rgba(23,24,27,0.65)';
+    ctx.fillRect(x-4, y-9, w+56, 14);
+    ctx.strokeStyle=PC[i]; ctx.lineWidth=1.5;
+    ctx.strokeRect(x, y-6, w, 8);                     // шкала: 0 → общее время
+    const k=clamp(t/dur,0,1);
+    ctx.fillStyle=PC[i];
+    ctx.fillRect(x, y-6, w*k, 8);                     // прогресс полёта
+    ctx.fillRect(x+w-1.5, y-9, 3, 14);               // метка прилёта на конце
+    ctx.fillStyle='#f5f2e8';
+    ctx.fillText(`${i===0?'A':'B'}: ${Math.round(dur)}мс`, x+w+8, y+3);
+  };
+  const mx=Math.max(pb.durA,pb.durB,pb.fDur[0]||0,pb.fDur[1]||0);
+  draw(0, mx);
+  draw(1, mx);
   ctx.restore();
 }
 
@@ -1216,15 +1491,94 @@ function runSelftest(){
       return a===false && b===true;
     }catch(e){ return false; }
   });
+  check('ST20 зоны: прилёт в морду = head', ()=>{
+    const r=resolveRound(buildTraj([P(150,350),P(692,338)]), buildTraj([P(810,120),P(860,90)]), 'timing');
+    return r.type==='hits' && r.hitA===true && r.zoneA==='head';
+  });
+  check('ST21 зоны: прилёт в хвост = tail', ()=>{
+    const r=resolveRound(buildTraj([P(150,430),P(806,436)]), buildTraj([P(810,120),P(860,90)]), 'timing');
+    return r.type==='hits' && r.hitA===true && r.zoneA==='tail';
+  });
+  check('ST22 крит по морде: −2 рыбки', ()=>{
+    const saveHp=S.hp.slice(), savePhase=S.phase;
+    S.hp=[BASE_HP,BASE_HP]; S.phase='draw'; S.mode='bot'; S.clinchMode='timing';
+    forceRound([P(150,350),P(692,338)], [P(810,120),P(860,90)]);
+    const ok=S.hp[1]===BASE_HP-2;
+    S.hp=saveHp; S.phase=savePhase; S.winner=-1; S.doubleKO=false;
+    syncHp();
+    return ok;
+  });
+  check('ST23 финт: фантом не блокирует и не бьёт', ()=>{
+    /* main A и main B не пересекаются; фантом A пересекает main B — клинча и урона быть не должно */
+    const saveHp=S.hp.slice(), savePhase=S.phase;
+    S.hp=[BASE_HP,BASE_HP]; S.phase='draw'; S.mode='bot'; S.clinchMode='timing'; S.ghosts=[];
+    forceRound([P(150,480),P(700,530)], [P(810,120),P(200,120)], [P(150,90),P(810,200)], null);
+    const r=S.lastRes;
+    const ok=r.type==='hits' && r.hitA===false && r.hitB===false &&
+             S.hp[0]===BASE_HP && S.hp[1]===BASE_HP;
+    S.hp=saveHp; S.phase=savePhase; S.ghosts=[]; S.winner=-1; S.doubleKO=false;
+    syncHp();
+    return ok;
+  });
+  check('ST24 девятая жизнь: desperate продавливает при Δ до 144 мс', ()=>{
+    /* B прилетает в точку на ~120 мс позже: обычный резолв — разминовка, desperate B — пари-продавливание */
+    const A=buildTraj([P(150,300),P(750,400)]);
+    const B=buildTraj([P(810,300),P(410,355),P(210,400)]);
+    const base=resolveRound(A,B,'timing');
+    const nine=resolveRound(A,B,'timing',{desperate:[false,true]});
+    return base.type==='hits' &&
+           nine.type==='clinch' && nine.kind==='parry' && nine.winner===1 && nine.nine===true &&
+           nine.deltaMs>PARRY_WIN && nine.deltaMs<=PARRY_WIN*1.25;
+  });
+  check('ST25 анти-спам: 3 синхро-клинча подряд = вялые лапы', ()=>{
+    const saveHp=S.hp.slice(), savePhase=S.phase, saveMode=S.mode, saveCM=S.clinchMode, saveG=S.ghosts.slice();
+    S.hp=[BASE_HP,BASE_HP]; S.phase='draw'; S.mode='bot'; S.clinchMode='timing';
+    for(let k=0;k<3;k++){
+      forceRound([P(150,300),P(750,400)], [P(810,300),P(210,400)]);
+      if(S.phase!=='result') S.phase='result';
+      showOvl(null);
+    }
+    const ok=S.syncStreak>=3 && S.lazy && S.lazy[0]===true && S.lazy[1]===true;
+    S.hp=saveHp; S.phase=savePhase; S.mode=saveMode; S.clinchMode=saveCM; S.ghosts=saveG;
+    S.winner=-1; S.doubleKO=false; S.syncStreak=0; S.lazy=null; S.rage=null;
+    syncHp();
+    return ok;
+  });
+  check('ST26 sudden death: встречные дуги не блокируются', ()=>{
+    const A=buildTraj([P(150,300),P(750,400)]);
+    const B=buildTraj([P(810,300),P(210,400)]);
+    const r=resolveRound(A,B,'timing',{sudden:true});
+    return r.type==='hits' && r.sudden===true;
+  });
+  check('ST27 призраки: после раунда остаются', ()=>{
+    const saveHp=S.hp.slice(), savePhase=S.phase;
+    S.hp=[BASE_HP,BASE_HP]; S.phase='draw'; S.mode='bot'; S.clinchMode='any'; S.ghosts=[];
+    forceRound([P(150,470),P(700,470)], [P(810,120),P(200,120)]);
+    const ok=S.ghosts.length===1;
+    S.hp=saveHp; S.phase=savePhase; S.ghosts=[]; S.winner=-1; S.doubleKO=false;
+    syncHp();
+    return ok;
+  });
+  check('ST28 фол по хвосту: жертва бесится (+15% скорости)', ()=>{
+    const saveHp=S.hp.slice(), savePhase=S.phase;
+    S.hp=[BASE_HP,BASE_HP]; S.phase='draw'; S.mode='bot'; S.clinchMode='timing'; S.ghosts=[]; S.rage=null; S.rageNext=null;
+    forceRound([P(150,430),P(806,436)], [P(810,120),P(860,90)]);
+    const ok=S.rage && S.rage[1]===true && S.hp[1]===BASE_HP-1;
+    S.hp=saveHp; S.phase=savePhase; S.ghosts=[]; S.winner=-1; S.doubleKO=false;
+    S.rage=null; S.rageNext=null;
+    syncHp();
+    return ok;
+  });
   const total=Object.keys(results).length;
   const failed=Object.entries(results).filter(([k,v])=>!v).map(([k])=>k);
   const out={passed:total-failed.length, total, failed, results};
   window.__FIGHT_TEST=out;
   return out;
 }
-function forceRound(ptsA, ptsB){
+function forceRound(ptsA, ptsB, feintA, feintB){
   const A=buildTraj(ptsA), B=buildTraj(ptsB);
   S.trajs=[A,B];
+  S.slots=[{main:A, feint:feintA?buildTraj(feintA):null}, {main:B, feint:feintB?buildTraj(feintB):null}];
   const res=resolveRound(A,B);
   applyRound(res);
   return res;
@@ -1232,30 +1586,41 @@ function forceRound(ptsA, ptsB){
 
 /* ═══════════════ DEBUG API ═══════════════ */
 window.__fight={
-  v:2,
-  get state(){ return {phase:S.phase, hp:S.hp.slice(), round:S.round, winner:S.winner, mode:S.mode, doubleKO:S.doubleKO, clinchMode:S.clinchMode}; },
+  v:3,
+  get state(){ return {phase:S.phase, hp:S.hp.slice(), round:S.round, winner:S.winner, mode:S.mode,
+    doubleKO:S.doubleKO, clinchMode:S.clinchMode, sudden:S.sudden, syncStreak:S.syncStreak,
+    lazy:S.lazy, rage:S.rage, ghosts:S.ghosts.length}; },
   start(m){ startMatch(m); },
   lobby(){ screenLobby(); },
   forceRound,
-  submitPath(pts){
+  submitPath(pts, asFeint){
     if(S.phase!=='draw') return {err:'not in draw phase'};
     const traj=buildTraj(pts);
     if(traj.total<MIN_TRAJ) return {err:'too short'};
-    S.trajs[S.drawingPlayer]=traj;
-    finishDrawPhase();
+    const p=S.drawingPlayer;
+    if(!S.slots[p]) S.slots[p]={main:null, feint:null};
+    if(!S.slots[p].main) S.slots[p].main=traj;
+    else if(asFeint) S.slots[p].feint=traj;
     return {ok:true};
   },
+  commit(){ commitDrawPhase(); return {ok:true}; },
   botPath,
-  resolve(ptsA, ptsB, mode){
+  resolve(ptsA, ptsB, mode, opts){
     const A=buildTraj(ptsA), B=buildTraj(ptsB);
-    return resolveRound(A,B,mode);
+    return resolveRound(A,B,mode,opts);
   },
   sfx,
   get clinchMode(){ return S.clinchMode; },
-  zoneInfo(i){ const c=catCenter(i); return {x:c.x, y:c.y, rx:ZONE_RX, ry:ZONE_RY}; },
+  zoneInfo(i){
+    const b=catCenter(i);
+    return {body:{x:b.x,y:b.y,rx:ZONE_RX,ry:ZONE_RY},
+      head:zoneCenter(i,'head'), tail:zoneCenter(i,'tail')};
+  },
+  zonesOf(p){ return hitZoneKind(p,0)&&hitZoneKind(p,1); },
   ticks(){ return ticks; },
   renderOnce(){ render(performance.now()); },
-  world:{W,H,FLOOR,CATX}
+  postmortem(on){ S.postmor=on===undefined?!S.postmor:!!on; render(performance.now()); },
+  world:{W,H,FLOOR,CATX,BASE_SPEED,SYNC_MS,PARRY_WIN}
 };
 
 /* ═══════════════ ИНИЦИАЛИЗАЦИЯ ═══════════════ */
