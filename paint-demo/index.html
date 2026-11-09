@@ -7,168 +7,212 @@
 <script>window.__errs = []; window.onerror = function (m, s, l, c) { window.__errs.push(m + ' @' + s + ':' + l + ':' + c); return false; };</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
   body {
-    min-height: 100vh; padding: 22px 14px;
-    background: radial-gradient(1100px 700px at 30% -10%, #232a38 0%, #161a24 55%, #0f1219 100%);
-    color: #e8eaf0;
-    font: 14px/1.45 "Segoe UI", Tahoma, Arial, sans-serif;
+    min-height: 100vh; padding: 12px 14px 16px;
+    background: #17181b;
+    background: linear-gradient(180deg, #1b1d21 0%, #141518 100%);
+    color: #d7d9de;
+    font: 13px/1.4 "Segoe UI", Tahoma, Arial, sans-serif;
+    -webkit-user-select: none; user-select: none;
   }
-  .wrap { max-width: 980px; margin: 0 auto; }
+  .app { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
 
-  h1 { font-size: 22px; letter-spacing: .3px; color: #f2f4fa; }
-  .sub { color: #8b93a7; margin: 3px 0 18px; font-size: 13px; }
+  /* ---------- верхняя полоса ---------- */
+  .top {
+    display: flex; align-items: baseline; gap: 12px; padding: 2px 4px 0;
+  }
+  .brand { font-size: 15.5px; font-weight: 700; letter-spacing: .3px; color: #f2f3f6; white-space: nowrap; }
+  .tagline { font-size: 11.5px; color: #8f939c; white-space: nowrap; }
+  .top .keys { margin-left: auto; font-size: 10.5px; color: #6c707a; white-space: nowrap; }
+  .top .keys b { color: #a6aab3; font-weight: 600; }
 
-  .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  /* ---------- рабочая зона: док инструментов + сцена + цвет ---------- */
+  .main { display: flex; gap: 10px; align-items: stretch; }
 
-  /* ---------- сцена с котом ---------- */
+  /* --- док инструментов (колонка слева, как в Krita / Ibis) --- */
+  .dock {
+    flex: 0 0 50px; display: flex; flex-direction: column; gap: 5px; align-items: stretch;
+    background: #212328; border: 1px solid #35373d; border-radius: 10px; padding: 6px 5px;
+  }
+  .tbtn, .dbtn {
+    height: 38px; border: 1px solid transparent; border-radius: 8px; background: transparent;
+    color: #b9bcc4; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: .12s; padding: 0;
+  }
+  .tbtn:hover, .dbtn:hover:not(:disabled) { background: #2c2e34; color: #f0f1f4; }
+  .tbtn.active { background: #f5a94b; color: #191a1e; }
+  .tbtn svg, .dbtn svg { width: 19px; height: 19px; }
+  .dbtn:disabled { opacity: .28; cursor: default; }
+  .dock .div { height: 1px; background: #35373d; margin: 4px 3px; }
+
+  /* --- центр: панель кисти над полотном + сцена --- */
+  .center { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .brushbar {
+    background: #212328; border: 1px solid #35373d; border-radius: 10px; padding: 8px 12px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .btypes { display: flex; gap: 5px; }
+  .bbtn {
+    width: 52px; height: 42px; border: 1px solid transparent; border-radius: 8px;
+    background: transparent; color: #b9bcc4; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    transition: .12s; padding: 0;
+  }
+  .bbtn:hover { background: #2c2e34; color: #f0f1f4; }
+  .bbtn.active { border-color: #f5a94b; background: rgba(245,169,75,.12); color: #ffd9a3; }
+  .bbtn svg { width: 17px; height: 17px; }
+  .bbtn span { font-size: 8.5px; letter-spacing: .2px; }
+
+  .bdiv { width: 1px; align-self: stretch; background: #35373d; }
+
+  .sliders { display: flex; align-items: center; gap: 10px; flex: 1 1 320px; min-width: 0; }
+  .sgrp { display: flex; align-items: center; gap: 7px; flex: 1 1 0; min-width: 96px; }
+  .sgrp .lab { font-size: 9.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #8f939c; white-space: nowrap; }
+  .sgrp input[type=range] { flex: 1 1 0; min-width: 44px; accent-color: #f5a94b; }
+  .sgrp .val { min-width: 26px; text-align: right; color: #b8bac0; font-variant-numeric: tabular-nums; font-size: 11px; }
+  #brushPrev {
+    width: 42px; height: 42px; border-radius: 8px; flex: 0 0 auto;
+    background: #17181b; border: 1px solid #3b3d44;
+  }
+
+  /* --- сцена с котом --- */
   .stage {
-    position: relative; flex: 0 0 auto;
-    padding: 10px; border-radius: 14px;
-    background: repeating-conic-gradient(#2a2f3c 0% 25%, #232834 0% 50%) 0 0 / 20px 20px;
-    border: 1px solid rgba(255,255,255,.07);
-    box-shadow: 0 14px 40px rgba(0,0,0,.45), inset 0 0 24px rgba(0,0,0,.35);
+    position: relative; align-self: flex-start;
+    padding: 9px; border-radius: 10px;
+    background: repeating-conic-gradient(#26282d 0% 25%, #2d3036 0% 50%) 0 0 / 18px 18px;
+    border: 1px solid #35373d;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5);
   }
-  #work { display: block; width: 600px; height: 400px; max-width: 100%; cursor: crosshair; touch-action: none; border-radius: 6px; }
+  #work { display: block; width: 600px; height: 400px; max-width: 100%; cursor: crosshair; touch-action: none; border-radius: 4px; }
   .stage .hint {
-    position: absolute; left: 12px; bottom: 5px; color: #767f94; font-size: 11px;
+    position: absolute; left: 11px; bottom: 4px; color: #696c75; font-size: 10.5px;
     pointer-events: none; user-select: none;
   }
 
-  /* ---------- панель ---------- */
-  .panel {
-    flex: 1 1 280px; min-width: 272px; max-width: 320px;
-    background: linear-gradient(180deg, #1d222d 0%, #181c26 100%);
-    border: 1px solid rgba(255,255,255,.07);
-    border-radius: 14px;
-    box-shadow: 0 14px 40px rgba(0,0,0,.45);
-    padding: 14px;
-    display: flex; flex-direction: column; gap: 12px;
+  /* --- панель цвета --- */
+  .side {
+    flex: 0 0 262px; display: flex; flex-direction: column; gap: 9px;
+    background: #212328; border: 1px solid #35373d; border-radius: 10px; padding: 11px;
   }
   .section { display: flex; flex-direction: column; gap: 7px; }
-  .section + .section { border-top: 1px solid rgba(255,255,255,.06); padding-top: 11px; }
-  .cap { font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #9aa5c0; }
-
-  .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .tbtn {
-    height: 42px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
-    background: rgba(255,255,255,.04); color: #cfd5e4; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; transition: .15s;
-  }
-  .tbtn:hover { background: rgba(255,255,255,.09); color: #fff; }
-  .tbtn.active { background: #f5b04c; border-color: #f5b04c; color: #14161d; box-shadow: 0 4px 14px rgba(245,176,76,.35); }
-  .tbtn svg { width: 20px; height: 20px; }
-
-  .brow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .bbtn {
-    height: 44px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
-    background: rgba(255,255,255,.04); color: #cfd5e4; cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    transition: .15s; padding: 0 2px;
-  }
-  .bbtn:hover { background: rgba(255,255,255,.09); color: #fff; }
-  .bbtn.active { border-color: #f5b04c; background: rgba(245,176,76,.14); color: #ffd9a3; }
-  .bbtn svg { width: 18px; height: 18px; }
-  .bbtn span { font-size: 9px; letter-spacing: .2px; }
-
-  .sizes { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
-  .sbtn {
-    flex: 1; height: 34px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px;
-    background: rgba(255,255,255,.04); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; transition: .15s;
-  }
-  .sbtn:hover { background: rgba(255,255,255,.09); }
-  .sbtn.active { border-color: #f5b04c; background: rgba(245,176,76,.14); }
-  .sbtn i { display: block; border-radius: 50%; background: #dbe0ec; }
-  .sbtn.active i { background: #f5b04c; }
-  .sbtn i.d3 { width: 4px; height: 4px; } .sbtn i.d6 { width: 8px; height: 8px; }
-  .sbtn i.d12 { width: 14px; height: 14px; } .sbtn i.d22 { width: 22px; height: 22px; }
-
+  .section + .section { border-top: 1px solid #2e3036; padding-top: 9px; }
+  .cap { font-size: 9.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #8f939c; }
   .oprow { display: flex; align-items: center; gap: 9px; }
-  .oprow .cap { letter-spacing: .5px; }
-  .oprow input[type=range] { flex: 1; accent-color: #f5b04c; }
-  .oprow .val { min-width: 38px; text-align: right; color: #aeb6c9; font-variant-numeric: tabular-nums; font-size: 12px; }
+  .oprow .cap { min-width: 86px; }
 
   .currow { display: flex; gap: 8px; align-items: center; }
-  .chip { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); cursor: pointer; }
-  #curColor { box-shadow: 0 0 0 2px rgba(245,176,76,.55); }
+  .chip { width: 27px; height: 27px; border-radius: 7px; border: 1px solid rgba(255,255,255,.14); cursor: pointer; }
+  #curColor { box-shadow: 0 0 0 2px rgba(245,169,75,.55); }
   .chip:hover { border-color: rgba(255,255,255,.35); }
   .hexwrap { flex: 1; display: flex; gap: 6px; align-items: center; }
   #hexIn {
-    width: 82px; background: #12151d; color: #eef0f7; border: 1px solid rgba(255,255,255,.1);
-    border-radius: 8px; padding: 5px 8px; font: 12px Consolas, Menlo, monospace;
+    width: 82px; background: #17181b; color: #eef0f3; border: 1px solid #3b3d44;
+    border-radius: 7px; padding: 5px 8px; font: 11.5px Consolas, Menlo, monospace;
   }
-  #hexIn:focus { outline: 1px solid #f5b04c; }
+  #hexIn:focus { outline: 1px solid #f5a94b; }
 
-  #svSquare, #hueBar { border-radius: 8px; cursor: crosshair; touch-action: none; border: 1px solid rgba(255,255,255,.1); width: 100%; }
-  .picker { display: flex; flex-direction: column; gap: 7px; }
-  #svSquare { height: 128px; }
-  #hueBar { height: 14px; }
+  #svSquare, #hueBar { border-radius: 7px; cursor: crosshair; touch-action: none; border: 1px solid #3b3d44; width: 100%; }
+  .picker { display: flex; flex-direction: column; gap: 6px; }
+  #svSquare { height: 92px; }
+  #hueBar { height: 12px; }
 
-  .swrow { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
-  .sw { width: 24px; height: 24px; border-radius: 7px; border: 1px solid rgba(0,0,0,.35); cursor: pointer; padding: 0; transition: .12s; }
-  .sw:hover { transform: translateY(-2px); }
-  .sw.active { outline: 2px solid #f5b04c; outline-offset: 1px; }
-  .swempty { font-size: 11px; color: #6b7488; }
+  .ptabs { display: flex; gap: 4px; margin: 2px 0; }
+  .ptab {
+    flex: 1; height: 25px; border: 1px solid #3b3d44; border-radius: 7px;
+    background: #1b1c20; color: #a0a3ab; font-size: 11px; cursor: pointer;
+    transition: .12s; padding: 0;
+  }
+  .ptab:hover { background: #2c2e34; color: #f0f1f4; }
+  .ptab.active { background: rgba(245,169,75,.14); border-color: #f5a94b; color: #ffd9a3; font-weight: 700; }
+  .ppane { display: flex; flex-direction: column; gap: 6px; }
+  #paneCW { max-height: 176px; overflow-y: auto; padding-right: 4px; }
+
+  .cwgrp { display: flex; flex-direction: column; gap: 4px; }
+  .cwgrp .glab { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: #83868f; }
+  .cwrow { display: flex; flex-wrap: wrap; gap: 4px; }
+  .cw {
+    width: 19px; height: 19px; border-radius: 5px; border: 1px solid rgba(0,0,0,.4);
+    cursor: pointer; padding: 0; transition: .12s;
+  }
+  .cw:hover { transform: scale(1.18); }
+  .cw.active { outline: 2px solid #f5a94b; outline-offset: 1px; }
+
+  .histrow { display: flex; flex-wrap: wrap; gap: 4px; min-height: 17px; }
+  .histrow .sw {
+    width: 16px; height: 16px; border-radius: 5px;
+    border: 1px solid rgba(0,0,0,.35); cursor: pointer; padding: 0; transition: .12s;
+  }
+  .sw:hover { transform: translateY(-1px); }
+  .sw.active { outline: 2px solid #f5a94b; outline-offset: 1px; }
+  .swempty { font-size: 10px; color: #62656e; }
 
   .acts { display: flex; gap: 6px; }
   .abtn {
-    flex: 1; height: 36px; border-radius: 9px; border: 1px solid rgba(255,255,255,.08);
-    background: rgba(255,255,255,.05); color: #dbe0ec; font-size: 12.5px; cursor: pointer; transition: .15s;
+    flex: 1; height: 32px; border-radius: 8px; border: 1px solid #3b3d44;
+    background: #1b1c20; color: #d7d9de; font-size: 12px; cursor: pointer; transition: .12s;
   }
-  .abtn:hover:not(:disabled) { background: rgba(255,255,255,.11); color: #fff; }
-  .abtn:disabled { opacity: .35; cursor: default; }
-  .abtn.danger:hover:not(:disabled) { background: rgba(255,90,90,.18); color: #ffb4b4; border-color: rgba(255,90,90,.3); }
+  .abtn:hover:not(:disabled) { background: #2c2e34; color: #fff; }
+  .abtn:disabled { opacity: .3; cursor: default; }
+  .abtn.danger:hover:not(:disabled) { background: rgba(226,85,79,.16); color: #ffb4b4; border-color: rgba(226,85,79,.4); }
   .gbtn {
-    flex: 2; height: 36px; border-radius: 9px; border: none; cursor: pointer; padding: 0 10px;
-    background: linear-gradient(135deg, #f5b04c 0%, #e8932f 100%); color: #16181f; font-weight: 700; font-size: 12px;
-    transition: .15s; box-shadow: 0 4px 14px rgba(232,147,47,.3); white-space: nowrap;
+    flex: 2; height: 32px; border-radius: 8px; border: none; cursor: pointer; padding: 0 10px;
+    background: linear-gradient(135deg, #f5a94b 0%, #e08a2e 100%); color: #191a1e; font-weight: 700; font-size: 12px;
+    transition: .12s; box-shadow: none; white-space: nowrap;
   }
   .gbtn:hover { filter: brightness(1.08); }
   .exp { display: flex; gap: 6px; }
   .exp .abtn { flex: 1; }
 
-  @media (max-width: 960px) { .row { flex-direction: column; } #work { width: 100%; height: auto; } }
+  @media (max-width: 1040px) {
+    .main { flex-direction: column; }
+    .dock { flex-direction: row; flex: 0 0 auto; align-self: flex-start; }
+    .dock .div { height: auto; width: 1px; margin: 3px 4px; }
+    .side { flex: 1 1 auto; }
+    #work { width: 100%; height: auto; }
+  }
 
   #selftest {
-    display: none; margin: 14px auto 0; max-width: 980px; padding: 10px 14px;
-    background: #12151d; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+    display: none; margin: 0 auto; max-width: 1280px; padding: 10px 14px;
+    background: #121317; border: 1px solid #35373d; border-radius: 10px;
     color: #b9e3a0; font: 12px/1.6 Consolas, Menlo, monospace; white-space: pre-wrap;
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>&#128062; KNS Paint</h1>
-  <p class="sub">Рисуй окрас по коту как в Paint — краска не выходит за кота, контур всегда поверх рисунка.</p>
+<div class="app">
+  <header class="top">
+    <div class="brand">&#128062; KNS Paint</div>
+    <div class="tagline">краска не выходит за кота · контур всегда поверх рисунка</div>
+    <div class="keys"><b>1–4</b> инструменты · <b>B</b> сменить кисть · <b>Ctrl+Z</b> отмена</div>
+  </header>
 
-  <div class="row">
-    <div class="stage">
-      <canvas id="work" width="300" height="200"></canvas>
-      <span class="hint">кот — оригинальный скетч 300×200</span>
-    </div>
+  <div class="main">
+    <nav class="dock" title="Инструменты">
+      <button type="button" class="tbtn active" id="toolBrush" title="Кисть (1) — крась по коту, за края не выйдет">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
+      </button>
+      <button type="button" class="tbtn" id="toolEraser" title="Ластик (2) — стирает твою краску, кот и контур остаются">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8.5l-5.2-5.2a1.5 1.5 0 0 1 0-2.1l9.4-9.4a1.5 1.5 0 0 1 2.1 0l4.9 4.9a1.5 1.5 0 0 1 0 2.1L13 19"/><path d="M9.4 8.6l6 6"/></svg>
+      </button>
+      <button type="button" class="tbtn" id="toolFill" title="Заливка (3) — заливает схожую область, останавливается на контуре">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11L12.3 4.3a1 1 0 0 0-1.4 0l-8 8a1 1 0 0 0 0 1.4l5.6 5.6c.4.4 1 .4 1.4 0l8.1-8.1a1 1 0 0 0 0-1.3z"/><path d="M4.5 13.5l6-6"/><path d="M20.5 16.5c0 1.4-1.1 2.5-2.3 2.5s-2.2-1.1-2.2-2.5c0-1 1.3-2.8 2.2-4 1 1.2 2.3 3 2.3 4z" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button type="button" class="tbtn" id="toolPicker" title="Пипетка (4) — взять цвет с картинки">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 6.5l-6.1 6.1a2 2 0 0 0-.5 1l-.8 3 3-.8a2 2 0 0 0 1-.5l6.1-6.1"/><path d="M12.6 4.4l2.6-2.6a2.1 2.1 0 0 1 3 0l3.9 3.9a2.1 2.1 0 0 1 0 3l-2.6 2.6"/><path d="M9.5 9.5l5 5"/><path d="M12.6 4.4l6.9 6.9"/></svg>
+      </button>
+      <div class="div"></div>
+      <button type="button" class="dbtn" id="btnUndo" title="Отменить (Ctrl/Cmd+Z)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5L3 10l5 5"/><path d="M3 10h11a6 6 0 0 1 6 6v3"/></svg>
+      </button>
+      <button type="button" class="dbtn" id="btnRedo" title="Вернуть (Ctrl/Cmd+Shift+Z)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5l5 5-5 5"/><path d="M21 10H10a6 6 0 0 0-6 6v3"/></svg>
+      </button>
+    </nav>
 
-    <div class="panel">
-      <div class="section">
-        <div class="cap">Инструменты</div>
-        <div class="tools">
-          <button type="button" class="tbtn active" id="toolBrush" title="Кисть (1) — крась по коту, за края не выйдет">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
-          </button>
-          <button type="button" class="tbtn" id="toolEraser" title="Ластик (2) — стирает твою краску, кот и контур остаются">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8.5l-5.2-5.2a1.5 1.5 0 0 1 0-2.1l9.4-9.4a1.5 1.5 0 0 1 2.1 0l4.9 4.9a1.5 1.5 0 0 1 0 2.1L13 19"/><path d="M9.4 8.6l6 6"/></svg>
-          </button>
-          <button type="button" class="tbtn" id="toolFill" title="Заливка (3) — заливает схожую область, останавливается на контуре">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11L12.3 4.3a1 1 0 0 0-1.4 0l-8 8a1 1 0 0 0 0 1.4l5.6 5.6c.4.4 1 .4 1.4 0l8.1-8.1a1 1 0 0 0 0-1.3z"/><path d="M4.5 13.5l6-6"/><path d="M20.5 16.5c0 1.4-1.1 2.5-2.3 2.5s-2.2-1.1-2.2-2.5c0-1 1.3-2.8 2.2-4 1 1.2 2.3 3 2.3 4z" fill="currentColor" stroke="none"/></svg>
-          </button>
-          <button type="button" class="tbtn" id="toolPicker" title="Пипетка (4) — взять цвет с картинки">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 6.5l-6.1 6.1a2 2 0 0 0-.5 1l-.8 3 3-.8a2 2 0 0 0 1-.5l6.1-6.1"/><path d="M12.6 4.4l2.6-2.6a2.1 2.1 0 0 1 3 0l3.9 3.9a2.1 2.1 0 0 1 0 3l-2.6 2.6"/><path d="M9.5 9.5l5 5"/><path d="M12.6 4.4l6.9 6.9"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="cap">Кисть</div>
-        <div class="brow">
+    <div class="center">
+      <div class="brushbar">
+        <div class="btypes">
           <button type="button" class="bbtn active" id="brushRound" title="Круглая — мягкость края зависит от «жёсткости»">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="5.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.6" opacity=".4" stroke-width="2.4"/></svg>
             <span>круглая</span>
@@ -186,24 +230,35 @@
             <span>спрей</span>
           </button>
         </div>
-        <div class="sizes">
-          <button type="button" class="sbtn" data-sz="3"><i class="d3"></i></button>
-          <button type="button" class="sbtn active" data-sz="6"><i class="d6"></i></button>
-          <button type="button" class="sbtn" data-sz="12"><i class="d12"></i></button>
-          <button type="button" class="sbtn" data-sz="22"><i class="d22"></i></button>
-        </div>
-        <div class="oprow">
-          <span class="cap">Жёсткость</span>
-          <input type="range" id="hardness" min="0" max="100" step="5" value="70">
-          <span class="val" id="hardnessVal">70%</span>
-        </div>
-        <div class="oprow">
-          <span class="cap">Прозрачность</span>
-          <input type="range" id="opacity" min="5" max="100" step="5" value="100">
-          <span class="val" id="opacityVal">100%</span>
+        <div class="bdiv"></div>
+        <div class="sliders">
+          <div class="sgrp" title="Диаметр кисти в пикселях">
+            <span class="lab">Размер</span>
+            <input type="range" id="sizeRange" min="1" max="24" step="1" value="6" title="Размер кисти">
+            <span class="val" id="sizeVal">6</span>
+          </div>
+          <canvas id="brushPrev" width="42" height="42" title="Как ложится кисть"></canvas>
+          <div class="bdiv"></div>
+          <div class="sgrp" title="Резкость края мазка">
+            <span class="lab">Жёсткость</span>
+            <input type="range" id="hardness" min="0" max="100" step="5" value="70" title="Жёсткость края">
+            <span class="val" id="hardnessVal">70%</span>
+          </div>
+          <div class="sgrp" title="Прозрачность мазка">
+            <span class="lab">Прозрачность</span>
+            <input type="range" id="opacity" min="5" max="100" step="5" value="100" title="Прозрачность">
+            <span class="val" id="opacityVal">100%</span>
+          </div>
         </div>
       </div>
 
+      <div class="stage">
+        <canvas id="work" width="300" height="200"></canvas>
+        <span class="hint">кот — оригинальный скетч 300×200</span>
+      </div>
+    </div>
+
+    <aside class="side">
       <div class="section">
         <div class="cap">Цвет</div>
         <div class="currow">
@@ -213,24 +268,17 @@
             <input type="text" id="hexIn" value="#f5e5ce" spellcheck="false" title="HEX-код цвета">
           </div>
         </div>
-        <div class="picker">
+        <div class="ptabs">
+          <button type="button" class="ptab active" data-pt="own">Свой</button>
+          <button type="button" class="ptab" data-pt="cw">CatWar</button>
+        </div>
+        <div class="ppane" id="paneOwn">
           <canvas id="svSquare" width="280" height="128"></canvas>
           <canvas id="hueBar" width="280" height="14"></canvas>
         </div>
-      </div>
-
-      <div class="section">
-        <div class="cap">Недавние цвета</div>
-        <div class="swrow" id="histRow"></div>
-        <span class="swempty" id="histEmpty">рисуй — цвета соберутся здесь</span>
-      </div>
-
-      <div class="section">
-        <div class="cap">Правка</div>
-        <div class="acts">
-          <button type="button" class="abtn" id="btnUndo" title="Ctrl/Cmd+Z">&#8630; отменить</button>
-          <button type="button" class="abtn" id="btnRedo" title="Ctrl/Cmd+Shift+Z">&#8631; вернуть</button>
-        </div>
+        <div class="ppane" id="paneCW" hidden></div>
+        <div class="cap" style="margin-top:2px">Недавние</div>
+        <div class="histrow" id="histRow"></div>
       </div>
 
       <div class="section">
@@ -243,7 +291,7 @@
           <button type="button" class="gbtn" id="btnExpWork" title="PNG с котом и окрасом">скачать кота</button>
         </div>
       </div>
-    </div>
+    </aside>
   </div>
 
   <pre id="selftest"></pre>
@@ -254,16 +302,16 @@
 (function () {
 'use strict';
 /* ============================================================
-   KNS Paint v5 — кисть по коту с контрактом:
-   1) краска не выходит за силуэт кота (клип по альфе скетча);
+   KNS Paint v6 — кисть по коту с контрактом:
+   1) краска не выходит за силуэт кота И не плотнее скетча
+      на АА-кромке (cap по альфе — нет артефактов у ушей/спины);
    2) контур кота (тёмные линии скетча) всегда ПОВЕРХ краски;
-   3) кисти: круглая / плоская / карандаш / спрей +
-      слайдер жёсткости (чёткости края);
-   4) ластик стирает краску (живой мазок ластика = маска
-      вычитания, а сама база и контур не трогаются).
-   Живой мазок = ПУТЬ штампов; каждый px штампуется один раз
-   за кадр с MAX-альфой (нет накопления плотности), цвет
-   переносится одной операцией с итоговой прозрачностью.
+   3) кисти: круглая / плоская / карандаш / спрей,
+      жёсткость края + компактный слайдер размера с превью;
+   4) ластик стирает краску до базы, кот и контур не трогаются;
+   5) seed штампов зависит только от позиции на пути — карандаш
+      и спрей не «дёргаются» при движении курсора;
+   6) цвет: таб «Свой» (HSV) и «CatWar» (палитры окрасов CatWar).
    ============================================================ */
 
 var D = window.PAINT_DATA || (typeof PAINT_DATA !== 'undefined' ? PAINT_DATA : null);
@@ -328,18 +376,21 @@ var work = $('work'), wctx = ctx2d(work);
 /* ---------- ассеты ---------- */
 var assets = { base: new Image() };
 assets.base.src = D.base;
-var baseImageData = null, silArr = null, darkArr = null;
+var baseImageData = null, silArr = null, darkArr = null, alphaCap = null;
 
 function buildBase() {
   bctx.drawImage(assets.base, 0, 0, W, H);
   baseImageData = bctx.getImageData(0, 0, W, H);
   var n = W * H, bd = baseImageData.data;
-  silArr = new Uint8Array(n); darkArr = new Uint8Array(n);
+  silArr = new Uint8Array(n); darkArr = new Uint8Array(n); alphaCap = new Uint8Array(n);
   /* lineCv — контур (тёмные линии скетча), рисуется ПОВЕРХ краски в композите */
   var li = linectx.createImageData(W, H), ld = li.data;
   for (var i = 0; i < n; i++) {
     var o = i * 4;
     if (bd[o + 3] > 0) silArr[i] = 1;
+    /* АА-кромка: плотность краски ограничена альфой скетча — за визуальный
+       край кота краска не вылезает (артефакты у ушей/спины), кромка смягчается */
+    alphaCap[i] = bd[o + 3];
     var avg = (bd[o] + bd[o + 1] + bd[o + 2]) / 3;
     if (bd[o + 3] > 200 && avg < 90) darkArr[i] = 1;
     if (darkArr[i]) {
@@ -429,8 +480,8 @@ function hashF(seed, salt) {
   return frac(Math.abs(v));
 }
 
-/* круглый штамп: r — радиус, hard — жёсткость 0..1 */
-function stampRound(uA, x, y, r, hard) {
+/* круглый штамп: r — радиус, hard — жёсткость 0..1; nocap — ластик (без АА-капа) */
+function stampRound(uA, x, y, r, hard, nocap) {
   var x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(W - 1, Math.ceil(x + r));
   var y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(H - 1, Math.ceil(y + r));
   var r2 = r * r, stepI = 1 / r;
@@ -440,15 +491,17 @@ function stampRound(uA, x, y, r, hard) {
       var dx = px - x, dy = py - y, d2 = dx * dx + dy * dy;
       if (d2 > r2) continue;
       var i = rowW + px;
-      if (!silArr[i]) continue;              /* КЛИП по силуэту кота */
+      var cap = alphaCap[i];
+      if (!cap) continue;                   /* КЛИП по силуэту кота */
       var t = Math.sqrt(d2) * stepI;
       var a = profA(t, hard);
+      if (!nocap && a > cap) a = cap;        /* АА-кромка: не плотней скетча (кроме ластика) */
       if (a > uA[i]) uA[i] = a;
     }
   }
 }
 /* плоский штамп-эллипс вдоль ang (направление движения в радианах) */
-function stampFlat(uA, x, y, r, hard, ang) {
+function stampFlat(uA, x, y, r, hard, ang, nocap) {
   var rb = Math.max(0.8, r * 0.42);           /* малая полуось */
   var x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(W - 1, Math.ceil(x + r));
   var y0 = Math.max(0, Math.floor(y - rb)), y1 = Math.min(H - 1, Math.ceil(y + rb));
@@ -457,19 +510,21 @@ function stampFlat(uA, x, y, r, hard, ang) {
     var rowW = py * W;
     for (var px = x0; px <= x1; px++) {
       var i = rowW + px;
-      if (!silArr[i]) continue;
+      var cap = alphaCap[i];
+      if (!cap) continue;
       var dx = px - x, dy = py - y;
       var along = dx * ca + dy * sa;           /* вдоль мазка */
       var across = -dx * sa + dy * ca;         /* поперёк */
       var t = Math.max(Math.abs(along) / r, Math.abs(across) / rb);
       if (t > 1) continue;
       var a = profA(t, hard);
+      if (!nocap && a > cap) a = cap;
       if (a > uA[i]) uA[i] = a;
     }
   }
 }
 /* карандаш: тонкое твёрдое ядро с зернистостью (джиттер детерминирован) */
-function stampPencil(uA, x, y, r, seed) {
+function stampPencil(uA, x, y, r, seed, nocap) {
   var re = Math.max(0.7, r * 0.32);
   var jx = (hashF(seed, 1) - 0.5) * re * 1.2;
   var jy = (hashF(seed, 2) - 0.5) * re * 1.2;
@@ -483,15 +538,17 @@ function stampPencil(uA, x, y, r, seed) {
       var dx = px - cx, dy = py - cy, d2 = dx * dx + dy * dy;
       if (d2 > r2) continue;
       var i = rowW + px;
-      if (!silArr[i]) continue;
+      var cap = alphaCap[i];
+      if (!cap) continue;
       var t = Math.sqrt(d2) / re;
       var a = profA(Math.min(1, t * 0.9), 0.85);  /* почти резкое ядро */
+      if (!nocap && a > cap) a = cap;
       if (a > uA[i]) uA[i] = a;
     }
   }
 }
 /* спрей: распылённые точки по кругу; плотность растёт от seed-ошумления */
-function stampSpray(uA, x, y, r, seed) {
+function stampSpray(uA, x, y, r, seed, nocap) {
   var n = Math.max(3, Math.round(r * r * 0.28));
   for (var k = 0; k < n; k++) {
     var ang = hashF(seed + k, 3) * Math.PI * 2;
@@ -500,8 +557,8 @@ function stampSpray(uA, x, y, r, seed) {
     var sy = Math.round(y + Math.sin(ang) * dist);
     if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue;
     var i = sy * W + sx;
-    if (!silArr[i]) continue;
-    if (uA[i] < 170) uA[i] = 255;
+    if (!alphaCap[i]) continue;
+    if (uA[i] < 170) uA[i] = nocap ? 255 : alphaCap[i];
   }
 }
 
@@ -518,11 +575,12 @@ function redrawLive() {
   uA.fill(0);
   var o = liveStroke;
   var pts = o.pts;
-  var seed0 = pts.length * 7 + 13;
+  /* SEED ЗАВИСИТ ТОЛЬКО ОТ ПОЗИЦИИ ШТАМПА НА ПУТИ (k — сегмент, s — шаг):
+     добавление новых точек НЕ меняет вид старой части линии — карандаш и
+     спрей больше не «дёргаются», пока курсор не отпущен */
   if (pts.length === 1) {
-    placeStamp(pts[0].x, pts[0].y, 0, o, seed0);
+    placeStamp(pts[0].x, pts[0].y, 0, o, 77);
   } else {
-    var seedI = 0;
     for (var k = 1; k < pts.length; k++) {
       var pA = pts[k - 1], pB = pts[k];
       var dx = pB.x - pA.x, dy = pB.y - pA.y;
@@ -531,8 +589,7 @@ function redrawLive() {
       var steps = Math.max(1, Math.ceil(dist / step));
       for (var s = 1; s <= steps; s++) {
         placeStamp(pA.x + dx * s / steps, pA.y + dy * s / steps,
-          Math.atan2(dy, dx), o, seed0 + seedI);
-        seedI++;
+          Math.atan2(dy, dx), o, 1000 + k * 131 + s);
       }
     }
   }
@@ -546,11 +603,11 @@ function redrawLive() {
   lctx.putImageData(liveImg, 0, 0);
 }
 function placeStamp(x, y, ang, o, seed) {
-  var r = o.radius, hard = o.hard;
-  if (o.brush === 'pencil') stampPencil(uA, x, y, r, seed);
-  else if (o.brush === 'spray') stampSpray(uA, x, y, r, seed);
-  else if (o.brush === 'flat') stampFlat(uA, x, y, r, hard, ang);
-  else stampRound(uA, x, y, r, hard);
+  var r = o.radius, hard = o.hard, nc = o.erase === true;
+  if (o.brush === 'pencil') stampPencil(uA, x, y, r, seed, nc);
+  else if (o.brush === 'spray') stampSpray(uA, x, y, r, seed, nc);
+  else if (o.brush === 'flat') stampFlat(uA, x, y, r, hard, ang, nc);
+  else stampRound(uA, x, y, r, hard, nc);
 }
 function liveStampParams() {
   return {
@@ -665,7 +722,8 @@ function floodFillAt(ax, ay, uo) {
   for (var k = 0; k < region.length; k++) {
     if (!silArr[region[k]]) continue;
     var p = region[k] * 4;
-    idd[p] = c.r; idd[p + 1] = c.g; idd[p + 2] = c.b; idd[p + 3] = 255;
+    idd[p] = c.r; idd[p + 1] = c.g; idd[p + 2] = c.b;
+    idd[p + 3] = alphaCap[region[k]];  /* АА-кромка заливки — кап по скетчу */
   }
   fctx.putImageData(img, 0, 0);
   pctx.globalAlpha = alpha;
@@ -706,7 +764,7 @@ function tryRestore() {
     if (!raw) return;
     var o = JSON.parse(raw);
     if (o && typeof o.color === 'string') setColor(o.color, true);
-    if (o && typeof o.size === 'number' && [3, 6, 12, 22].indexOf(o.size) >= 0) setSize(o.size);
+    if (o && typeof o.size === 'number' && o.size >= 1 && o.size <= 24) setSize(Math.round(o.size));
     if (o && typeof o.hardness === 'number' && o.hardness >= 0 && o.hardness <= 100) {
       state.hardness = Math.round(o.hardness / 5) * 5;
       $('hardness').value = state.hardness;
@@ -751,16 +809,136 @@ function setTool(t) {
   for (var k in map) $(map[k]).classList.toggle('active', k === t);
 }
 function setSize(s) {
+  s = Math.max(1, Math.min(24, Math.round(s)));
   state.size = s;
-  var btns = document.querySelectorAll('.sbtn');
-  for (var j = 0; j < btns.length; j++)
-    btns[j].classList.toggle('active', parseInt(btns[j].getAttribute('data-sz'), 10) === s);
+  $('sizeRange').value = s;
+  $('sizeVal').textContent = String(s);
+  drawBrushPrev();
 }
 function setBrush(b) {
   state.brush = b;
   var map = { round: 'brushRound', flat: 'brushFlat', pencil: 'brushPencil', spray: 'brushSpray' };
   for (var k in map) $(map[k]).classList.toggle('active', k === b);
+  drawBrushPrev();
 }
+
+/* ---------- превью кисти: как ляжет мазок (тип × размер × жёсткость) ---------- */
+var prevCv = $('brushPrev'), prevCtx = prevCv.getContext('2d');
+function brushPrevShape(cx, cy, s, c) {
+  /* отдельная peaked-функция края, повторяет profA */
+  var type = state.brush;
+  var r = state.size / 2, hr = Math.min(state.hardness / 100, 0.98);
+  var op = state.opacity / 100;
+  if (type === 'pencil') {
+    var re = Math.max(0.7, r * 0.32);
+    prevCtx.fillStyle = c;
+    prevCtx.globalAlpha = op * 0.92;
+    prevCtx.beginPath();
+    prevCtx.arc(cx + (hashF(77, 1) - 0.5) * re, cy + (hashF(77, 2) - 0.5) * re, Math.max(0.6, re * s), 0, Math.PI * 2);
+    prevCtx.fill();
+    prevCtx.globalAlpha = 1;
+    return;
+  }
+  if (type === 'spray') {
+    var rr = r * s;
+    var n = Math.max(3, Math.round(r * r * 0.28));
+    prevCtx.fillStyle = c;
+    prevCtx.globalAlpha = op;
+    for (var k = 0; k < n; k++) {
+      var ang = hashF(77 + k, 3) * Math.PI * 2;
+      var dist = Math.sqrt(hashF(77 + k, 4)) * rr * 0.98;
+      prevCtx.beginPath();
+      prevCtx.arc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 1.1, 0, Math.PI * 2);
+      prevCtx.fill();
+    }
+    prevCtx.globalAlpha = 1;
+    return;
+  }
+  var ell = type === 'flat';
+  var rx = ell ? r * s : r * s;
+  var ry = ell ? Math.max(0.8, r * 0.42) * s : r * s;
+  var rot = ell ? -0.55 : 0;
+  var g = prevCtx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
+  g.addColorStop(0, c);
+  g.addColorStop(hr, c);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  prevCtx.save();
+  prevCtx.translate(cx, cy);
+  prevCtx.rotate(rot);
+  prevCtx.globalAlpha = op;
+  prevCtx.scale(ell ? rx / ry : 1, 1);
+  prevCtx.fillStyle = g;
+  prevCtx.beginPath();
+  prevCtx.arc(0, 0, ell ? ry : Math.max(rx, ry), 0, Math.PI * 2);
+  prevCtx.fill();
+  prevCtx.restore();
+  prevCtx.globalAlpha = 1;
+}
+function drawBrushPrev() {
+  var w = prevCv.width, h = prevCv.height;
+  prevCtx.clearRect(0, 0, w, h);
+  var c = hexRGB(state.color) || { r: 245, g: 229, b: 206 };
+  var col = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
+  var maxR = w * 0.42;
+  var s = Math.min(3.4, maxR / Math.max(1, state.size / 2));
+  brushPrevShape(w / 2, h / 2, s, col);
+}
+
+/* ---------- табы цвета: «Свой» / CatWar ---------- */
+var CW_PALETTES = [
+  { name: 'Шерсть', colors: ['#f5e5ce', '#ffffff', '#e6e6e6', '#d1d1d1', '#9e9e9e', '#5c5c5c', '#242424', '#141414', '#1d212c', '#2b1d1c', '#3d1c0b', '#6b3c28', '#9a715f', '#bd6d32', '#cb4402', '#e15c0f', '#ed9b2d', '#e5bd7f', '#d7ae98', '#b19798', '#a6b4b7', '#697a8a', '#465165', '#323d51'] },
+  { name: 'Тёплые', colors: ['#9C7941', '#362121', '#612322', '#D6700B', '#FCB10D', '#FCDF00', '#B3B059', '#A8AB0C', '#2FA12D', '#7DC210', '#0ECC90', '#87C3D4', '#148CCC', '#192580', '#7D8996'] },
+  { name: 'Рыжие', colors: ['#9C7941', '#362121', '#612322', '#B90000', '#D6700B', '#FCB10D', '#FCDF00', '#B3B059', '#A8AB0C', '#2FA12D', '#7DC210', '#0ECC90', '#87C3D4', '#148CCC', '#192580', '#7D8996'] },
+  { name: 'Глаза', colors: ['#9C7941', '#362121', '#612322', '#B90000', '#D6700B', '#FCB10D', '#FCDF00', '#B3B059', '#A8AB0C', '#2FA12D', '#7DC210', '#0ECC90', '#87C3D4', '#148CCC', '#192580', '#7D8996', '#734563'] },
+  { name: 'Нос', colors: ['#f5e5ce', '#ffffff', '#9e9e9e', '#242424', '#3d1c0b', '#6b3c28', '#9a715f', '#bd6d32', '#e15c0f', '#cc8370', '#b19798', '#465165'] },
+  { name: 'Усы', colors: ['#ffffff', '#5c5c5c', '#242424'] }
+];
+function buildCWPane() {
+  var pane = $('paneCW');
+  pane.innerHTML = '';
+  CW_PALETTES.forEach(function (g) {
+    var grp = document.createElement('div');
+    grp.className = 'cwgrp';
+    var lab = document.createElement('span');
+    lab.className = 'glab';
+    lab.textContent = g.name;
+    grp.appendChild(lab);
+    var row = document.createElement('div');
+    row.className = 'cwrow';
+    g.colors.forEach(function (hex) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cw' + (hex.toLowerCase() === state.color ? ' active' : '');
+      b.style.background = hex;
+      b.title = hex;
+      b.addEventListener('click', function () {
+        setColor(hex);
+        var all = pane.querySelectorAll('.cw');
+        for (var j = 0; j < all.length; j++) all[j].classList.remove('active');
+        b.classList.add('active');
+      });
+      row.appendChild(b);
+    });
+    grp.appendChild(row);
+    pane.appendChild(grp);
+  });
+}
+function setColorPane(which) {
+  var tabs = document.querySelectorAll('.ptab');
+  for (var i = 0; i < tabs.length; i++)
+    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-pt') === which);
+  $('paneOwn').hidden = which !== 'own';
+  $('paneCW').hidden = which !== 'cw';
+  if (which === 'cw' && !$('paneCW').childNodes.length) buildCWPane();
+}
+(function () {
+  var tabs = document.querySelectorAll('.ptab');
+  for (var i = 0; i < tabs.length; i++) {
+    (function (b) {
+      b.onclick = function () { setColorPane(b.getAttribute('data-pt')); };
+    })(tabs[i]);
+  }
+})();
 function pushHistoryRaw(hex) {
   if (history[0] === hex) return;
   var idx = history.indexOf(hex);
@@ -771,7 +949,13 @@ function pushHistoryRaw(hex) {
 function renderHistory() {
   var row = $('histRow');
   row.innerHTML = '';
-  $('histEmpty').style.display = history.length ? 'none' : 'inline';
+  if (!history.length) {
+    var em = document.createElement('span');
+    em.className = 'swempty';
+    em.id = 'histEmpty';
+    em.textContent = 'рисуй — цвета соберутся здесь';
+    row.appendChild(em);
+  }
   history.slice(0, HIST_MAX).forEach(function (h) {
     var b = document.createElement('button');
     b.type = 'button';
@@ -795,6 +979,7 @@ function setColor(hex, skipHistory) {
     if (skipHistory !== true) pushHistoryRaw(hex);
     setHSVfromHex(hex);
     renderHistory();
+    drawBrushPrev();
     if (skipHistory !== true) schedulePersist();
   }
 }
@@ -918,20 +1103,22 @@ $('brushRound').onclick = function () { setBrush('round'); schedulePersist(); };
 $('brushFlat').onclick = function () { setBrush('flat'); schedulePersist(); };
 $('brushPencil').onclick = function () { setBrush('pencil'); schedulePersist(); };
 $('brushSpray').onclick = function () { setBrush('spray'); schedulePersist(); };
-var szBtns = document.querySelectorAll('.sbtn');
-for (var szi = 0; szi < szBtns.length; szi++) {
-  (function (b) {
-    b.onclick = function () { setSize(parseInt(b.getAttribute('data-sz'), 10)); schedulePersist(); };
-  })(szBtns[szi]);
-}
 $('hardness').addEventListener('input', function () {
   state.hardness = parseInt(this.value, 10);
   $('hardnessVal').textContent = state.hardness + '%';
+  drawBrushPrev();
   schedulePersist();
 });
 $('opacity').addEventListener('input', function () {
   state.opacity = parseInt(this.value, 10);
   $('opacityVal').textContent = state.opacity + '%';
+  drawBrushPrev();
+  schedulePersist();
+});
+$('sizeRange').addEventListener('input', function () {
+  state.size = parseInt(this.value, 10);
+  $('sizeVal').textContent = String(state.size);
+  drawBrushPrev();
   schedulePersist();
 });
 $('btnUndo').onclick = doUndo;
@@ -952,6 +1139,11 @@ window.addEventListener('keydown', function (e) {
   else if (!mod && k === '2') setTool('eraser');
   else if (!mod && k === '3') setTool('fill');
   else if (!mod && k === '4') setTool('picker');
+  else if (!mod && k === 'b') {
+    var cyc = ['round', 'flat', 'pencil', 'spray'];
+    var cur = cyc.indexOf(state.brush);
+    setBrush(cyc[(cur + 1) % cyc.length]);
+  }
 });
 
 /* ---------- экспорт ---------- */
@@ -1155,6 +1347,50 @@ function runSelfTest() {
   } catch (err) { }
   rec('ST11', ok11, 'localStorage сохранён (краска ' + len11 + ' симв., кисть/жёсткость в стейте)');
 
+  /* ST12: АА-КРОМКА — краска на полупрозрачном краю силуэта не плотнее скетча
+     (после заливки тела + жёсткого мазка по кромке) */
+  var P12 = snapPaint();
+  floodFillAt(152, 100, { color: '#ff5500', opacity: 100 });
+  strokeLine(BODY.x, BODY.y, BODY.x + 12, BODY.y, { brush: 'flat', size: 12, hardness: 100, color: '#ff5500', opacity: 100 });
+  var pd12 = snapPaint(), bd12 = baseImageData.data;
+  var over = 0, edgePx = 0;
+  for (var i12 = 0; i12 < W * H; i12++) {
+    var o12 = i12 * 4;
+    if (bd12[o12 + 3] > 0 && bd12[o12 + 3] < 255) {
+      edgePx++;
+      if (pd12.data[o12 + 3] > Math.min(255, bd12[o12 + 3]) + 2) over++;
+    }
+  }
+  var undoOk12 = doUndo() && doUndo() && dataEqual(snapPaint(), P12);
+  rec('ST12', over === 0,
+    'АА-кромка: ' + edgePx + ' полупрозр. px, плотнее скетча ' + over + ' (жду 0); undo x2: ' + undoOk12);
+
+  /* ST13: СТАБИЛЬНОСТЬ КАРАНДАША — добавление точек пути не меняет
+     уже нарисованную часть (seed не зависит от длины пути) */
+  var P13 = snapPaint();
+  setBrush('pencil');
+  liveBegin(BODY.x, BODY.y);
+  liveMove(BODY.x + 3, BODY.y + 1);
+  liveMove(BODY.x + 6, BODY.y);
+  liveMove(BODY.x + 9, BODY.y + 1);
+  var lv = liveCv;
+  function zoneHash(x0, y0, x1, y1) {
+    var hsm = 0, dd = lv.getContext('2d').getImageData(0, 0, W, H).data;
+    for (var yy = y0; yy <= y1; yy++)
+      for (var xx = x0; xx <= x1; xx++) hsm = (hsm + dd[(yy * W + xx) * 4 + 3]) % 1000003;
+    return hsm;
+  }
+  /* зона только старой части пути (до x+7), новые сегменты стартуют с x+9 */
+  var hBefore13 = zoneHash(BODY.x, BODY.y - 6, BODY.x + 7, BODY.y + 6);
+  liveMove(BODY.x + 14, BODY.y);
+  liveMove(BODY.x + 17, BODY.y + 1);
+  var hAfter13 = zoneHash(BODY.x, BODY.y - 6, BODY.x + 7, BODY.y + 6);
+  liveEnd();
+  var undoOk13 = doUndo() && dataEqual(snapPaint(), P13);
+  setBrush('round');
+  rec('ST13', hBefore13 === hAfter13 && undoOk13,
+    'карандаш стабилен: hash до ' + hBefore13 + ' == после ' + hAfter13 + ' (старая часть не дёргается); undo: ' + undoOk13);
+
   undoStack.length = 0; redoStack.length = 0;
   pctx.clearRect(0, 0, W, H);
   composite(); persistNow(); updateUndoUI();
@@ -1171,6 +1407,8 @@ function ready() {
   tryRestore();
   renderHistory();
   updateUndoUI();
+  setSize(state.size);
+  drawBrushPrev();
 }
 assets.base.onload = ready;
 assets.base.onerror = function () { };
@@ -1190,6 +1428,7 @@ window.PAINT = {
   assets: assets,
   work: work,
   paintCanvas: paintCv,
+  liveCanvas: function () { return liveCv; },
   baseImageData: function () { return baseImageData; },
   stroke: strokeLine,
   liveBegin: liveBegin, liveMove: liveMove, liveEnd: liveEnd,
@@ -1200,10 +1439,13 @@ window.PAINT = {
   clearPaint: clearPaint,
   setColor: setColor,
   setBrush: setBrush,
+  setSize: setSize,
   history: function () { return history.slice(); },
   composite: composite,
   persistNow: persistNow,
-  masks: { sil: function () { return silArr; }, dark: function () { return darkArr; } },
+  masks: { sil: function () { return silArr; }, dark: function () { return darkArr; }, cap: function () { return alphaCap; } },
+  setColorPane: setColorPane,
+  cwPalettes: function () { return CW_PALETTES.slice(); },
   runSelfTest: runSelfTest
 };
 })();
