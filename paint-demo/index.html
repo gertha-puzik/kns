@@ -1,278 +1,318 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KNS Paint</title>
 <script>window.__errs = []; window.onerror = function (m, s, l, c) { window.__errs.push(m + ' @' + s + ':' + l + ':' + c); return false; };</script>
 <style>
-  /* ===== токены конструктора KNS ===== */
-  body { background-color:#616517; /* background-image подставляется из PAINT_DATA.field.page */ font:13px/1.35 Tahoma, Verdana, sans-serif; color:#222; margin:0; padding:8px; }
-  h1 { font-size:18px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.45); margin:2px 0 2px; }
-  .concept { color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.45); margin:0 0 10px; }
-  .footer { margin-top:10px; color:#f2f2e6; text-shadow:0 1px 2px rgba(0,0,0,.5); font-size:12px; }
-  .wrap { display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; }
-  .panel { background:#f7f7f7; border:1px solid #aaa; padding:8px; }
-  .hdr { font-weight:bold; color:#5d7a61; border-bottom:1px dashed #bbb; padding-bottom:2px; margin:6px 0 6px; }
-  .panel > .hdr:first-child { margin-top:0; }
-  .btn { background:#eee; border:1px solid #999; border-color:#ccc #888 #888 #ccc; padding:3px 8px; font:inherit; cursor:pointer; color:#222; }
-  .btn:hover { border-color:#5d7a61; }
-  .btn.active { background:#cfe0cf; border-color:#7a9a7a; font-weight:bold; }
-  .btn:disabled { opacity:.5; cursor:default; }
-  .row { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; align-items:center; }
-  .lbl { color:#5d7a61; font-weight:bold; }
-  .toolcol { width:230px; }
-  .palcol { width:320px; }
-  canvas { image-rendering:pixelated; border:1px solid #999; background-color:#616517; /* background-image подставляется из PAINT_DATA.field.canvas */ }
-  #work { width:900px; height:600px; cursor:crosshair; touch-action:none; }   /* экранный масштаб x3 */
-  #field { width:360px; height:240px; filter:drop-shadow(0 4px 5px rgba(0,0,0,.3)); touch-action:none; }
-  .stage { display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; }
-  .sub { color:#5d7a61; font-weight:bold; margin:0 0 4px; }
-  .swrow { display:flex; flex-wrap:wrap; gap:4px; margin:0 0 6px; }
-  .sw { width:26px; height:18px; border:1px solid #666; padding:0; cursor:pointer; }
-  .sw:hover { border-color:#5d7a61; }
-  .sw.active { outline:2px solid #2e6b2e; outline-offset:1px; }
-  .exp { margin-top:8px; display:flex; flex-direction:column; gap:4px; }
-  #selftest { background:#171713; color:#c9e3a9; border:1px solid #444; padding:8px; font:12px/1.5 Consolas, Menlo, monospace; white-space:pre-wrap; margin:8px 0 0; }
-  #selftest:empty { display:none; }
-  input[type=range] { width:110px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; padding: 22px 14px;
+    background: radial-gradient(1100px 700px at 30% -10%, #232a38 0%, #161a24 55%, #0f1219 100%);
+    color: #e8eaf0;
+    font: 14px/1.45 "Segoe UI", Tahoma, Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  h1 { font-size: 22px; letter-spacing: .3px; color: #f2f4fa; }
+  .sub { color: #8b93a7; margin: 3px 0 18px; font-size: 13px; }
+
+  .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* ---------- сцена с котом ---------- */
+  .stage {
+    position: relative; flex: 0 0 auto;
+    padding: 10px; border-radius: 14px;
+    background: repeating-conic-gradient(#2a2f3c 0% 25%, #232834 0% 50%) 0 0 / 20px 20px;
+    border: 1px solid rgba(255,255,255,.07);
+    box-shadow: 0 14px 40px rgba(0,0,0,.45), inset 0 0 24px rgba(0,0,0,.35);
+  }
+  #work { display: block; width: 600px; height: 400px; max-width: 100%; cursor: crosshair; touch-action: none; border-radius: 6px; }
+  .stage .hint {
+    position: absolute; left: 12px; bottom: 5px; color: #767f94; font-size: 11px;
+    pointer-events: none; user-select: none;
+  }
+
+  /* ---------- панель ---------- */
+  .panel {
+    flex: 1 1 280px; min-width: 272px; max-width: 320px;
+    background: linear-gradient(180deg, #1d222d 0%, #181c26 100%);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    box-shadow: 0 14px 40px rgba(0,0,0,.45);
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 13px;
+  }
+  .section { display: flex; flex-direction: column; gap: 7px; }
+  .section + .section { border-top: 1px solid rgba(255,255,255,.06); padding-top: 12px; }
+  .cap { font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #9aa5c0; }
+
+  .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .tbtn {
+    height: 42px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+    background: rgba(255,255,255,.04); color: #cfd5e4; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: .15s;
+  }
+  .tbtn:hover { background: rgba(255,255,255,.09); color: #fff; }
+  .tbtn.active { background: #f5b04c; border-color: #f5b04c; color: #14161d; box-shadow: 0 4px 14px rgba(245,176,76,.35); }
+  .tbtn svg { width: 20px; height: 20px; }
+
+  .sizes { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
+  .sbtn {
+    flex: 1; height: 34px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px;
+    background: rgba(255,255,255,.04); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: .15s;
+  }
+  .sbtn:hover { background: rgba(255,255,255,.09); }
+  .sbtn.active { border-color: #f5b04c; background: rgba(245,176,76,.14); }
+  .sbtn i { display: block; border-radius: 50%; background: #dbe0ec; }
+  .sbtn.active i { background: #f5b04c; }
+  .sbtn i.d3 { width: 4px; height: 4px; } .sbtn i.d6 { width: 8px; height: 8px; }
+  .sbtn i.d12 { width: 14px; height: 14px; } .sbtn i.d22 { width: 22px; height: 22px; }
+
+  .oprow { display: flex; align-items: center; gap: 9px; }
+  .oprow .cap { letter-spacing: .5px; }
+  .oprow input[type=range] { flex: 1; accent-color: #f5b04c; }
+  .oprow .val { min-width: 38px; text-align: right; color: #aeb6c9; font-variant-numeric: tabular-nums; font-size: 12px; }
+
+  .currow { display: flex; gap: 8px; align-items: center; }
+  .chip { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); cursor: pointer; }
+  #curColor { box-shadow: 0 0 0 2px rgba(245,176,76,.55); }
+  .chip:hover { border-color: rgba(255,255,255,.35); }
+  .hexwrap { flex: 1; display: flex; gap: 6px; align-items: center; }
+  #hexIn {
+    width: 82px; background: #12151d; color: #eef0f7; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px; padding: 5px 8px; font: 12px Consolas, Menlo, monospace;
+  }
+  #hexIn:focus { outline: 1px solid #f5b04c; }
+
+  #svSquare, #hueBar { border-radius: 8px; cursor: crosshair; touch-action: none; border: 1px solid rgba(255,255,255,.1); width: 100%; }
+  .picker { display: flex; flex-direction: column; gap: 7px; }
+  #svSquare { height: 128px; }
+  #hueBar { height: 14px; }
+
+  .swrow { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
+  .sw { width: 24px; height: 24px; border-radius: 7px; border: 1px solid rgba(0,0,0,.35); cursor: pointer; padding: 0; transition: .12s; }
+  .sw:hover { transform: translateY(-2px); }
+  .sw.active { outline: 2px solid #f5b04c; outline-offset: 1px; }
+  .swempty { font-size: 11px; color: #6b7488; }
+
+  .acts { display: flex; gap: 6px; }
+  .abtn {
+    flex: 1; height: 36px; border-radius: 9px; border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.05); color: #dbe0ec; font-size: 12.5px; cursor: pointer; transition: .15s;
+  }
+  .abtn:hover:not(:disabled) { background: rgba(255,255,255,.11); color: #fff; }
+  .abtn:disabled { opacity: .35; cursor: default; }
+  .abtn.danger:hover:not(:disabled) { background: rgba(255,90,90,.18); color: #ffb4b4; border-color: rgba(255,90,90,.3); }
+  .gbtn {
+    flex: 2; height: 36px; border-radius: 9px; border: none; cursor: pointer; padding: 0 10px;
+    background: linear-gradient(135deg, #f5b04c 0%, #e8932f 100%); color: #16181f; font-weight: 700; font-size: 12px;
+    transition: .15s; box-shadow: 0 4px 14px rgba(232,147,47,.3); white-space: nowrap;
+  }
+  .gbtn:hover { filter: brightness(1.08); }
+  .exp { display: flex; gap: 6px; }
+  .exp .abtn { flex: 1; }
+
+  @media (max-width: 960px) { .row { flex-direction: column; } #work { width: 100%; height: auto; } }
+
+  #selftest {
+    display: none; margin: 14px auto 0; max-width: 980px; padding: 10px 14px;
+    background: #12151d; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+    color: #b9e3a0; font: 12px/1.6 Consolas, Menlo, monospace; white-space: pre-wrap;
+  }
 </style>
 </head>
 <body>
-<h1>KNS Paint — рисуй окрас сам</h1>
-<p class="concept">Концепт: окрас рисуется кистью поверх кота (скетч из загрузок, 300×200)</p>
-
 <div class="wrap">
-  <!-- ======== ИНСТРУМЕНТЫ ======== -->
-  <div class="panel toolcol">
-    <div class="hdr">Инструменты</div>
-    <div class="row">
-      <button type="button" class="btn tool active" id="toolBrush" title="Рисовать краской (поверх кота, краска не выходит за силуэт)">Кисть</button>
-      <button type="button" class="btn tool" id="toolEraser" title="Стирает краску до основы (ластик)">Ластик</button>
-    </div>
-    <div class="row">
-      <button type="button" class="btn tool" id="toolFill" title="Заливка зоны (тело/голова/хвост…), контур — барьер">Заливка</button>
-      <button type="button" class="btn tool" id="toolPicker" title="Взять цвет с картинки">Пипетка</button>
-    </div>
-    <div class="hdr">Размер кисти, арт-px</div>
-    <div class="row" id="sizes">
-      <button type="button" class="btn sz" data-sz="1">1</button>
-      <button type="button" class="btn sz active" data-sz="2">2</button>
-      <button type="button" class="btn sz" data-sz="3">3</button>
-      <button type="button" class="btn sz" data-sz="4">4</button>
-    </div>
-    <div class="row"><span class="lbl">Прозрачность:</span>
-      <input type="range" id="opacity" min="5" max="100" step="5" value="100">
-      <span id="opacityVal" class="lbl">100%</span>
-    </div>
-    <div class="hdr">Правка</div>
-    <div class="row">
-      <button type="button" class="btn" id="btnUndo" title="Ctrl/Cmd+Z" disabled>↶ Отменить</button>
-      <button type="button" class="btn" id="btnRedo" title="Ctrl/Cmd+Shift+Z, Ctrl+Y" disabled>↷ Вернуть</button>
-    </div>
-    <div class="row">
-      <button type="button" class="btn" id="btnClear">Очистить краску</button>
-    </div>
-    <div class="hdr">Показ</div>
-    <div class="row"><span class="lbl">База:</span>
-      <label><input type="radio" name="baseKind" value="gray" checked> скетч</label>
-      <label><input type="radio" name="baseKind" value="gold"> оригинал</label>
-    </div>
-    <label><input type="checkbox" id="lineOn" checked> Контур поверх</label>
-  </div>
+  <h1>&#128062; KNS Paint</h1>
+  <p class="sub">Рисуй окрас поверх кота как в Paint — любой цвет, любой мазок, можно полупрозрачно. Никаких границ: хочешь — выходи за края и рисуй свои контуры сам.</p>
 
-  <!-- ======== ХОЛСТ + ПРЕВЬЮ ======== -->
-  <div class="stage">
-    <div>
-      <p class="sub">Редактор (сероватый — зона краски, кисть не портит глаза/контур)</p>
+  <div class="row">
+    <div class="stage">
       <canvas id="work" width="300" height="200"></canvas>
+      <span class="hint">кот — оригинальный скетч 300×200</span>
     </div>
-    <div>
-      <p class="sub">На поле</p>
-      <canvas id="field" width="300" height="200"></canvas>
-      <div class="exp">
-        <button type="button" class="btn" id="btnExpWork">Скачать PNG (кот 300×200)</button>
-        <button type="button" class="btn" id="btnExpPaint">Скачать краску (только слой)</button>
+
+    <div class="panel">
+      <div class="section">
+        <div class="cap">Инструменты</div>
+        <div class="tools">
+          <button type="button" class="tbtn active" id="toolBrush" title="Кисть (1) — рисуй где угодно">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
+          </button>
+          <button type="button" class="tbtn" id="toolEraser" title="Ластик (2) — стирает твою краску, кот остаётся">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8.5l-5.2-5.2a1.5 1.5 0 0 1 0-2.1l9.4-9.4a1.5 1.5 0 0 1 2.1 0l4.9 4.9a1.5 1.5 0 0 1 0 2.1L13 19"/><path d="M9.4 8.6l6 6"/></svg>
+          </button>
+          <button type="button" class="tbtn" id="toolFill" title="Заливка (3) — заливает одинаковую область, останавливается на другой краске или линии">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11L12.3 4.3a1 1 0 0 0-1.4 0l-8 8a1 1 0 0 0 0 1.4l5.6 5.6c.4.4 1 .4 1.4 0l8.1-8.1a1 1 0 0 0 0-1.3z"/><path d="M4.5 13.5l6-6"/><path d="M20.5 16.5c0 1.4-1.1 2.5-2.3 2.5s-2.2-1.1-2.2-2.5c0-1 1.3-2.8 2.2-4 1 1.2 2.3 3 2.3 4z" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button type="button" class="tbtn" id="toolPicker" title="Пипетка (4) — взять цвет с картинки">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 6.5l-6.1 6.1a2 2 0 0 0-.5 1l-.8 3 3-.8a2 2 0 0 0 1-.5l6.1-6.1"/><path d="M12.6 4.4l2.6-2.6a2.1 2.1 0 0 1 3 0l3.9 3.9a2.1 2.1 0 0 1 0 3l-2.6 2.6"/><path d="M9.5 9.5l5 5"/><path d="M12.6 4.4l6.9 6.9"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="cap">Кисть</div>
+        <div class="sizes">
+          <button type="button" class="sbtn" data-sz="3"><i class="d3"></i></button>
+          <button type="button" class="sbtn active" data-sz="6"><i class="d6"></i></button>
+          <button type="button" class="sbtn" data-sz="12"><i class="d12"></i></button>
+          <button type="button" class="sbtn" data-sz="22"><i class="d22"></i></button>
+        </div>
+        <div class="oprow">
+          <span class="cap">Прозрачность</span>
+          <input type="range" id="opacity" min="5" max="100" step="5" value="100">
+          <span class="val" id="opacityVal">100%</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="cap">Цвет</div>
+        <div class="currow">
+          <div class="chip" id="prevColor" title="Прошлый цвет — вернуть его кликом"></div>
+          <div class="chip" id="curColor" title="Текущий цвет"></div>
+          <div class="hexwrap">
+            <input type="text" id="hexIn" value="#f5e5ce" spellcheck="false" title="HEX-код цвета">
+          </div>
+        </div>
+        <div class="picker">
+          <canvas id="svSquare" width="280" height="128"></canvas>
+          <canvas id="hueBar" width="280" height="14"></canvas>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="cap">Недавние цвета</div>
+        <div class="swrow" id="histRow"></div>
+        <span class="swempty" id="histEmpty">рисуй — цвета соберутся здесь</span>
+      </div>
+
+      <div class="section">
+        <div class="cap">Правка</div>
+        <div class="acts">
+          <button type="button" class="abtn" id="btnUndo" title="Ctrl/Cmd+Z">&#8630; отменить</button>
+          <button type="button" class="abtn" id="btnRedo" title="Ctrl/Cmd+Shift+Z">&#8631; вернуть</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="cap">Кот</div>
+        <div class="acts">
+          <button type="button" class="abtn danger" id="btnClear" title="Убрать всю краску, кот как был">стереть всё</button>
+        </div>
+        <div class="exp">
+          <button type="button" class="abtn" id="btnExpPaint" title="Только слой окраса, фон прозрачный">слой окраса</button>
+          <button type="button" class="gbtn" id="btnExpWork" title="PNG с котом и окрасом">скачать кота</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ======== ПАЛИТРА ======== -->
-  <div class="panel palcol">
-    <div class="hdr">Палитры</div>
-    <div id="palGroups"></div>
-    <div class="hdr">Свой цвет</div>
-    <div class="row"><input type="color" id="customColor" value="#f5e5ce"></div>
-    <div class="hdr">Цвет глаз <span style="font-weight:normal">(краска сюда не попадает — отдельный выбор)</span></div>
-    <div class="swrow" id="eyeGroup"></div>
-    <div class="row"><button type="button" class="btn" id="btnEyeReset" title="Вернуть оригинальные глаза">✕ оригинал</button></div>
-  </div>
+  <pre id="selftest"></pre>
 </div>
-
-<p class="footer">Демо на скетче из загрузок (v2) — интеграция в конструктор окрасов после одобрения концепта</p>
-
-<pre id="selftest"></pre>
 
 <script src="paint-data.js"></script>
 <script>
 (function () {
 'use strict';
 /* ============================================================
-   KNS Paint — демо концепта «окрас кистью поверх модельки».
-   Вся графика из PAINT_DATA (base/mannequin/lineart, палитры, поле).
-
-   Композит work 300×200 (каждое действие):
-     основа (манекен|база-скетч) → цвет глаз → краска (клип по
-     силуэту, глаза никогда не красятся) → контур (lineart, если включен).
+   KNS Paint v4 — «как в Paint»: свободная гладкая кисть поверх
+   оригинального скетча. Никаких зон, контуров и клипов:
+   краска ложится куда ткнули, игрок сам рисует контуры.
+   Полупрозрачность равномерная: живой мазок = ПУТЬ, каждый кадр
+   рисуется целиком одним stroke() в буфер мазка (одна операция
+   на кадр — нет накопления плотности в перекрытиях), по
+   завершении буфер переносится в paintCv с итоговой alpha.
    ============================================================ */
 
 var D = window.PAINT_DATA || (typeof PAINT_DATA !== 'undefined' ? PAINT_DATA : null);
-/* const PAINT_DATA из paint-data.js — лексический глобал, на window не попадает */
-var W = D.meta.w || 100, H = D.meta.h || 150;
-var KEY = 'kns_paint_sit_state';
+var W = D.meta.w, H = D.meta.h;
+var KEY = 'kns_paint_state_v4';
 
 function $(id) { return document.getElementById(id); }
 function mkCv() { var c = document.createElement('canvas'); c.width = W; c.height = H; return c; }
 function ctx2d(c) { return c.getContext('2d', { willReadFrequently: true }); }
 function hexRGB(hex) {
   var m = /^#?([0-9a-fA-F]{6})$/.exec(hex);
-  if (!m) return { r: 245, g: 229, b: 206 };
+  if (!m) return null;
   var v = parseInt(m[1], 16);
   return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+}
+function rgbHex(r, g, b) {
+  function u(x) { return (x < 16 ? '0' : '') + Math.round(x).toString(16); }
+  return '#' + u(r) + u(g) + u(b);
+}
+function rgb2hsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  var h = 0;
+  if (d > 0) {
+    if (mx === r) h = 60 * (((g - b) / d) % 6);
+    else if (mx === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+  }
+  if (h < 0) h += 360;
+  return { h: h, s: mx === 0 ? 0 : d / mx, v: mx };
+}
+function hsv2rgb(h, s, v) {
+  var c = v * s, hh = (((h % 360) + 360) % 360) / 60, x = c * (1 - Math.abs(hh % 2 - 1)), m = v - c;
+  var r = 0, g = 0, b = 0;
+  if (hh < 1) { r = c; g = x; }
+  else if (hh < 2) { r = x; g = c; }
+  else if (hh < 3) { g = c; b = x; }
+  else if (hh < 4) { g = x; b = c; }
+  else if (hh < 5) { r = x; b = c; }
+  else { r = c; b = x; }
+  return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
 }
 
 /* ---------- состояние ---------- */
 var state = {
-  tool: 'brush',       /* brush | eraser | fill | picker */
-  size: 2,             /* 1..4 арт-px */
-  opacity: 100,        /* 5..100 % */
+  tool: 'brush',          /* brush | eraser | fill | picker */
+  size: 6,                /* диаметр кисти, арт-px */
+  opacity: 100,
   color: '#f5e5ce',
-  eye: null,           /* hex или null (оригинал) */
-  base: 'gray',        /* gray | gold */
-  line: true
+  prevColor: '#828a8f'
 };
+var history = [];
+var HIST_MAX = 18;
 
 /* ---------- канвасы ---------- */
-var baseCv = mkCv(), mnCv = mkCv(), laCv = mkCv(), laClipCv = mkCv();
-var paintCv = mkCv(), clipCv = mkCv(), eyeMaskCv = mkCv(), eyeTintCv = mkCv();
-var bctx = ctx2d(baseCv), mctx = ctx2d(mnCv), lctx = ctx2d(laCv);
-var pctx = ctx2d(paintCv), cctx = ctx2d(clipCv), ectx = ctx2d(eyeMaskCv), etctx = ctx2d(eyeTintCv);
-var work = $('work'), field = $('field');
-var wctx = ctx2d(work), fctx = ctx2d(field);
+var baseCv = mkCv(), paintCv = mkCv(), liveCv = mkCv();
+var bctx = ctx2d(baseCv), pctx = ctx2d(paintCv), lctx = ctx2d(liveCv);
+var work = $('work'), wctx = ctx2d(work);
 
 /* ---------- ассеты ---------- */
-var assets = { base: new Image(), mannequin: new Image(), lineart: new Image() };
-assets.base.src = D.base; assets.mannequin.src = D.mannequin; assets.lineart.src = D.lineart;
+var assets = { base: new Image() };
+assets.base.src = D.base;
+var baseImageData = null, silArr = null, darkArr = null;
 
-var mnData = null, baseImageData = null, laData = null;
-var silArr = null, darkArr = null, eyeArr = null, zoneArr = null;
-var eyesIdx = (D.zones.eyes || []).slice();
-var FILL_GUARD = 1e9; /* переопределяется в buildMasks: 98% силуэта (скетч = одна зона краски) */
-
-/* ---------- маски (после загрузки ассетов) ---------- */
-function buildMasks() {
+function buildBase() {
   bctx.drawImage(assets.base, 0, 0, W, H);
-  mctx.drawImage(assets.mannequin, 0, 0, W, H);
-  lctx.drawImage(assets.lineart, 0, 0, W, H);
   baseImageData = bctx.getImageData(0, 0, W, H);
-  mnData = mctx.getImageData(0, 0, W, H);
-  laData = lctx.getImageData(0, 0, W, H);
-
-  var n = W * H;
-  silArr = new Uint8Array(n); darkArr = new Uint8Array(n); eyeArr = new Uint8Array(n);
-  var mnd = mnData.data;
-  var silCount = 0;
+  /* маски нужны ТОЛЬКО selftest-проверкам; движок рисования их не использует */
+  var n = W * H, bd = baseImageData.data;
+  silArr = new Uint8Array(n); darkArr = new Uint8Array(n);
   for (var i = 0; i < n; i++) {
     var o = i * 4;
-    if (mnd[o + 3] > 0) { silArr[i] = 1; silCount++; }
-    if (silArr[i] && (mnd[o] + mnd[o + 1] + mnd[o + 2]) / 3 < 90) darkArr[i] = 1;
+    if (bd[o + 3] > 0) silArr[i] = 1;
+    if (bd[o + 3] > 200 && (bd[o] + bd[o + 1] + bd[o + 2]) / 3 < 90) darkArr[i] = 1;
   }
-  FILL_GUARD = Math.round(silCount * 0.98);
-  /* зоны: карта пиксель → зона (первое подходящее имя, пустые зоны не мешают) */
-  var z2id = {}, zi = 0, z;
-  for (z in D.zones) { zi++; z2id[z] = zi; }
-  zoneArr = new Int16Array(n);
-  for (z in D.zones) {
-    var li = D.zones[z];
-    for (var k = 0; k < li.length; k++) if (zoneArr[li[k]] === 0) zoneArr[li[k]] = z2id[z];
-  }
-  window.__Z2ID = z2id; /* отладка/тесты */
-  /* маска глаз (alpha=255 только на глазах) — для destination-out в clippedPaint */
-  var em = ectx.createImageData(W, H), emd = em.data;
-  for (var e = 0; e < eyesIdx.length; e++) {
-    var ie = eyesIdx[e]; eyeArr[ie] = 1; emd[ie * 4 + 3] = 255;
-  }
-  ectx.putImageData(em, 0, 0);
-  /* lineart без зоны глаз: пиксели контура внутри глаз — копии пикселей базы,
-     их наложение давало ±1-3 байта (8-битный премул-блендинг) на полупрозрачных
-     AA-пикселях глаза; исключение делает глаза байт-в-байт базой при любом тумблере */
-  var lcx = ctx2d(laClipCv);
-  lcx.clearRect(0, 0, W, H);
-  lcx.drawImage(laCv, 0, 0);
-  lcx.globalCompositeOperation = 'destination-out';
-  lcx.drawImage(eyeMaskCv, 0, 0);
-  lcx.globalCompositeOperation = 'source-over';
 }
 
-/* ---------- глазной тинт ---------- */
-function eyeDarkCenter(bd) {
-  var darkCnt = 0, sx = 0, sy = 0;
-  for (var e = 0; e < eyesIdx.length; e++) {
-    var i = eyesIdx[e], o = i * 4;
-    if ((bd[o] + bd[o + 1] + bd[o + 2]) / 3 < 90) { darkCnt++; sx += i % W; sy += (i - i % W) / W; }
-  }
-  if (!darkCnt) return null;
-  return { cx: sx / darkCnt, cy: sy / darkCnt, frac: darkCnt / eyesIdx.length };
-}
-function applyEyeTint() {
-  var img = etctx.createImageData(W, H), d = img.data, bd = baseImageData.data;
-  var c = hexRGB(state.eye);
-  var dc = eyeDarkCenter(bd);
-  /* сплошной тёмный глаз (скетч): красим тёмную фигуру, ядро 3×3 у центра масс остаётся зрачком;
-     обычный глаз (M2): красим только средние тона, зрачок L<90 и блик L>190 не трогаем */
-  var solidDark = dc && dc.frac > 0.6;
-  for (var e = 0; e < eyesIdx.length; e++) {
-    var i = eyesIdx[e], o = i * 4;
-    var L = (bd[o] + bd[o + 1] + bd[o + 2]) / 3;
-    if (L > 190) continue;       /* блик — сохраняем оригинал (если появится) */
-    if (solidDark) {
-      var ex = i % W, ey = (i - i % W) / W;
-      if (Math.abs(ex - dc.cx) <= 1 && Math.abs(ey - dc.cy) <= 1) continue; /* зрачок-ядро */
-      if (L >= 90) continue;     /* вне тёмной фигуры (случайное серое кольцо глазницы) не трогаем */
-    } else {
-      if (L < 90) continue;     /* зрачок/тёмный контур — не трогаем */
-    }
-    d[o] = c.r; d[o + 1] = c.g; d[o + 2] = c.b; d[o + 3] = bd[o + 3];
-  }
-  etctx.putImageData(img, 0, 0);
-}
-
-/* ---------- композит ---------- */
-function buildClip() {
-  cctx.globalCompositeOperation = 'source-over';
-  cctx.clearRect(0, 0, W, H);
-  cctx.drawImage(paintCv, 0, 0);                       /* сырая краска */
-  cctx.globalCompositeOperation = 'destination-in';
-  cctx.drawImage(mnCv, 0, 0);                          /* клип по силуэту */
-  cctx.globalCompositeOperation = 'destination-out';
-  cctx.drawImage(eyeMaskCv, 0, 0);                     /* глаза никогда не красятся */
-  cctx.globalCompositeOperation = 'source-over';
-}
-
+/* ---------- композит: скетч + краска, БЕЗ клипа ---------- */
 function composite() {
-  buildClip();
-  if (state.eye) applyEyeTint();
   wctx.clearRect(0, 0, W, H);
-  wctx.drawImage(state.base === 'gold' ? baseCv : mnCv, 0, 0);
-  if (state.eye) wctx.drawImage(eyeTintCv, 0, 0);
-  wctx.drawImage(clipCv, 0, 0);
-  if (state.line) wctx.drawImage(laClipCv, 0, 0);
-  fctx.clearRect(0, 0, W, H);
-  fctx.drawImage(work, 0, 0);
+  wctx.drawImage(baseCv, 0, 0);
+  wctx.drawImage(paintCv, 0, 0);
+  if (liveStroke) wctx.drawImage(liveCv, 0, 0);
 }
 
 /* ---------- undo/redo ---------- */
-var undoStack = [], redoStack = [], MAX_UNDO = 50;
+var undoStack = [], redoStack = [], MAX_UNDO = 120;
 function paintSnapshot() { return pctx.getImageData(0, 0, W, H); }
 function pushUndo() {
   undoStack.push(paintSnapshot());
@@ -304,140 +344,140 @@ function clearPaint() {
   composite(); schedulePersist();
 }
 
-/* ---------- кисть ---------- */
-var maskCache = {};
-function brushMask(size) {
-  if (maskCache[size]) return maskCache[size];
-  var reff = size / 2 + 0.35;                 /* жёсткий диск, полное покрытие 1px */
-  var R = Math.ceil(reff), arr = [];
-  for (var dx = -R; dx <= R; dx++)
-    for (var dy = -R; dy <= R; dy++)
-      if (Math.sqrt(dx * dx + dy * dy) <= reff) arr.push([dx, dy]);
-  return (maskCache[size] = arr);
-}
-
-function dab(cx, cy, size, color, opacity, erase) {
-  pctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
-  pctx.globalAlpha = opacity / 100;
-  pctx.fillStyle = erase ? '#000' : color;
-  var offs = brushMask(size);
-  for (var k = 0; k < offs.length; k++) {
-    var x = cx + offs[k][0], y = cy + offs[k][1];
-    if (x >= 0 && y >= 0 && x < W && y < H) pctx.fillRect(x, y, 1, 1);
+/* ---------- живой мазок: путь, перерисовка целиком ---------- */
+var liveStroke = null; /* { pts:[{x,y}], erase, color, alpha, width } */
+function redrawLive() {
+  lctx.clearRect(0, 0, W, H);
+  if (!liveStroke || !liveStroke.pts.length) return;
+  var o = liveStroke;
+  if (o.erase) { lctx.globalCompositeOperation = 'destination-out'; lctx.strokeStyle = '#000'; lctx.fillStyle = '#000'; }
+  else { lctx.globalCompositeOperation = 'source-over'; lctx.strokeStyle = o.color; lctx.fillStyle = o.color; }
+  lctx.globalAlpha = o.alpha;
+  lctx.lineWidth = o.width;
+  lctx.lineJoin = 'round';
+  lctx.lineCap = 'round';
+  var pts = o.pts;
+  if (pts.length === 1) {
+    var r = Math.max(o.width / 2, 0.6);
+    lctx.beginPath();
+    lctx.arc(pts[0].x, pts[0].y, r, 0, Math.PI * 2);
+    lctx.fill();
+  } else {
+    lctx.beginPath();
+    lctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) lctx.lineTo(pts[i].x, pts[i].y);
+    lctx.stroke();
   }
+  lctx.globalAlpha = 1;
+  lctx.globalCompositeOperation = 'source-over';
+}
+function liveBegin(x, y) {
+  pushUndo();
+  liveStroke = {
+    pts: [{ x: x, y: y }],
+    erase: state.tool === 'eraser',
+    color: state.color,
+    alpha: state.opacity / 100,
+    width: state.size
+  };
+  redrawLive();
+  composite();
+}
+function liveMove(x, y) {
+  if (!liveStroke) return;
+  var last = liveStroke.pts[liveStroke.pts.length - 1];
+  if (Math.abs(x - last.x) + Math.abs(y - last.y) < 0.35) return;
+  liveStroke.pts.push({ x: x, y: y });
+  redrawLive();   /* весь путь одним stroke — равномерная прозрачность */
+  composite();
+}
+function liveEnd() {
+  if (!liveStroke) { schedulePersist(); return; }
+  redrawLive();
+  pctx.globalCompositeOperation = liveStroke.erase ? 'destination-out' : 'source-over';
+  pctx.globalAlpha = 1; /* alpha уже вшита в пиксели liveCv (redrawLive), повторно не ослабляем */
+  pctx.drawImage(liveCv, 0, 0);
   pctx.globalAlpha = 1;
   pctx.globalCompositeOperation = 'source-over';
+  lctx.clearRect(0, 0, W, H);
+  liveStroke = null;
+  composite(); schedulePersist();
 }
-
-function strokeOpts(o) {
-  o = o || {};
-  return {
-    size: o.size != null ? o.size : state.size,
-    color: o.color || state.color,
-    opacity: o.opacity != null ? o.opacity : state.opacity,
-    erase: o.erase === true || (o.erase === undefined && state.tool === 'eraser')
-  };
-}
-
-/* программный мазок: из (x0,y0) в (x1,y1), шаг ≤0.4 арт-px, центры пикселей Math.floor */
+/* программный мазок для тестов/зондов: путь (x0,y0)->(x1,y1) */
 function strokeLine(x0, y0, x1, y1, uo) {
-  var o = strokeOpts(uo);
+  var o = {
+    erase: uo && uo.erase === true,
+    color: (uo && uo.color) || state.color,
+    alpha: ((uo && uo.opacity) != null ? uo.opacity : state.opacity) / 100,
+    width: (uo && uo.size) || state.size
+  };
   pushUndo();
-  var dist = Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
-  var steps = Math.max(1, Math.ceil(dist / 0.4));
-  for (var t = 0; t <= steps; t++) {
-    var px = x0 + (x1 - x0) * t / steps, py = y0 + (y1 - y0) * t / steps;
-    dab(Math.floor(px), Math.floor(py), o.size, o.color, o.opacity, o.erase);
-  }
+  liveStroke = { pts: [{ x: x0, y: y0 }], erase: o.erase, color: o.color, alpha: o.alpha, width: o.width };
+  var dx = x1 - x0, dy = y1 - y0, dist = Math.sqrt(dx * dx + dy * dy);
+  var steps = Math.max(1, Math.ceil(dist * 2));
+  for (var t = 1; t <= steps; t++)
+    liveStroke.pts.push({ x: x0 + dx * t / steps, y: y0 + dy * t / steps });
+  redrawLive();
+  pctx.globalCompositeOperation = o.erase ? 'destination-out' : 'source-over';
+  pctx.globalAlpha = 1; /* alpha уже в пикселях liveCv */
+  pctx.drawImage(liveCv, 0, 0);
+  pctx.globalAlpha = 1;
+  pctx.globalCompositeOperation = 'source-over';
+  lctx.clearRect(0, 0, W, H);
+  liveStroke = null;
   composite(); schedulePersist();
 }
 
-var live = null; /* активный мазок указателя */
-function liveBegin(x, y) {
-  var o = strokeOpts();
-  pushUndo();
-  dab(Math.floor(x), Math.floor(y), o.size, o.color, o.opacity, o.erase);
-  composite();
-  live = { x: x, y: y };
+/* ---------- заливка: похожесть на ВИДИМОЙ картинке ---------- */
+var FILL_TOL = 38;
+function pxLike(d, o4i, o4j) {
+  return Math.abs(d[o4i] - d[o4j]) <= FILL_TOL &&
+         Math.abs(d[o4i + 1] - d[o4j + 1]) <= FILL_TOL &&
+         Math.abs(d[o4i + 2] - d[o4j + 2]) <= FILL_TOL &&
+         Math.abs(d[o4i + 3] - d[o4j + 3]) <= FILL_TOL;
 }
-function liveMove(x, y) {
-  if (!live) return;
-  var o = strokeOpts();
-  var dist = Math.sqrt((x - live.x) * (x - live.x) + (y - live.y) * (y - live.y));
-  if (dist < 0.01) return;
-  var steps = Math.ceil(dist / 0.4);
-  for (var t = 1; t <= steps; t++) {
-    var px = live.x + (x - live.x) * t / steps, py = live.y + (y - live.y) * t / steps;
-    dab(Math.floor(px), Math.floor(py), o.size, o.color, o.opacity, o.erase);
-  }
-  composite();
-  live = { x: x, y: y };
-}
-function liveEnd() { live = null; schedulePersist(); }
-
-/* ---------- заливка ---------- */
 function floodFillAt(ax, ay, uo) {
-  if (ax < 0 || ay < 0 || ax >= W || ay >= H) return false;
-  var i0 = ay * W + ax;
-  if (!silArr[i0] || darkArr[i0] || eyeArr[i0]) {
-    /* клик попал на контур/глаз/воздух — не отказ молча, а ближайшая годная
-       точка той же зоны (клик рядом с котом — любая), кольцами до 5 арт-px */
-    var z00 = silArr[i0] ? (zoneArr[i0] || null) : null;
-    var found = -1;
-    for (var rr = 1; rr <= 5 && found < 0; rr++) {
-      for (var ddy = -rr; ddy <= rr && found < 0; ddy++) {
-        for (var ddx = -rr; ddx <= rr; ddx++) {
-          if (Math.abs(ddx) !== rr && Math.abs(ddy) !== rr) continue;  /* только кольцо rr */
-          var fx = ax + ddx, fy = ay + ddy;
-          if (fx < 0 || fy < 0 || fx >= W || fy >= H) continue;
-          var fj = fy * W + fx;
-          if (silArr[fj] && !darkArr[fj] && !eyeArr[fj] && (z00 === null || zoneArr[fj] === z00)) {
-            found = fj; break;
-          }
-        }
-      }
-    }
-    if (found < 0) return false;
-    i0 = found;
-  }
-  var o = strokeOpts(uo);
-  var zone = zoneArr[i0];
-  var visited = new Uint8Array(W * H), stack = [i0], region = [];
-  visited[i0] = 1;
+  if (ax < 0 || ay < 0 || ax >= W || ay >= H) return 0;
+  composite();
+  var vis = wctx.getImageData(0, 0, W, H), vd = vis.data;
+  var start = ay * W + ax;
+  var visited = new Uint8Array(W * H), stack = [start], region = [];
+  visited[start] = 1;
   while (stack.length) {
     var i = stack.pop();
     region.push(i);
     var x = i % W, y = (i - x) / W;
-    if (x > 0)     test(i - 1);
-    if (x < W - 1) test(i + 1);
-    if (y > 0)     test(i - W);
-    if (y < H - 1) test(i + W);
+    var o4 = i * 4;
+    if (x > 0 && !visited[i - 1] && pxLike(vd, o4, (i - 1) * 4)) { visited[i - 1] = 1; stack.push(i - 1); }
+    if (x < W - 1 && !visited[i + 1] && pxLike(vd, o4, (i + 1) * 4)) { visited[i + 1] = 1; stack.push(i + 1); }
+    if (y > 0 && !visited[i - W] && pxLike(vd, o4, (i - W) * 4)) { visited[i - W] = 1; stack.push(i - W); }
+    if (y < H - 1 && !visited[i + W] && pxLike(vd, o4, (i + W) * 4)) { visited[i + W] = 1; stack.push(i + W); }
   }
-  function test(j) {
-    if (!visited[j] && silArr[j] && !darkArr[j] && !eyeArr[j] && zone === zoneArr[j]) {
-      visited[j] = 1; stack.push(j);
-    }
-  }
-  if (region.length > FILL_GUARD) return false;  /* залилось >3260 px — молча откат */
+  if (!region.length) return 0;
   pushUndo();
-  var img = pctx.getImageData(0, 0, W, H), d = img.data, c = hexRGB(o.color);
-  var a = Math.round(255 * o.opacity / 100);
+  var color = (uo && uo.color) || state.color;
+  var alpha = ((uo && uo.opacity) != null ? uo.opacity : state.opacity) / 100;
+  var c = hexRGB(color) || { r: 255, g: 255, b: 255 };
+  var fillCv = mkCv(), fctx = ctx2d(fillCv);
+  var img = fctx.createImageData(W, H), idd = img.data;
   for (var k = 0; k < region.length; k++) {
     var p = region[k] * 4;
-    d[p] = c.r; d[p + 1] = c.g; d[p + 2] = c.b; d[p + 3] = a;
+    idd[p] = c.r; idd[p + 1] = c.g; idd[p + 2] = c.b; idd[p + 3] = 255;
   }
-  pctx.putImageData(img, 0, 0);
+  fctx.putImageData(img, 0, 0);
+  pctx.globalAlpha = alpha;
+  pctx.drawImage(fillCv, 0, 0);
+  pctx.globalAlpha = 1;
   composite(); schedulePersist();
-  return true;
+  return region.length;
 }
 
 /* ---------- пипетка ---------- */
 function pickAt(ax, ay) {
   if (ax < 0 || ay < 0 || ax >= W || ay >= H) return false;
-  var px = wctx.getImageData(ax, ay, 1, 1).data;   /* готовый композит (с глазами/контуром) */
+  var px = wctx.getImageData(ax, ay, 1, 1).data;
   if (px[3] === 0) return false;
-  var hex = '#' + [px[0], px[1], px[2]].map(function (v) { return (v < 16 ? '0' : '') + v.toString(16); }).join('');
-  setColor(hex);
+  setColor(rgbHex(px[0], px[1], px[2]));
   return true;
 }
 
@@ -449,95 +489,162 @@ function schedulePersist() {
 }
 function persistNow() {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ p: paintCv.toDataURL('image/png'), eye: state.eye }));
-  } catch (e) { /* file:// без localStorage — молча */ }
+    localStorage.setItem(KEY, JSON.stringify({
+      p: paintCv.toDataURL('image/png'),
+      color: state.color, size: state.size, opacity: state.opacity,
+      history: history.slice(0, HIST_MAX)
+    }));
+  } catch (e) { }
 }
 function tryRestore() {
   try {
     var raw = localStorage.getItem(KEY);
     if (!raw) return;
     var o = JSON.parse(raw);
-    if (o && typeof o.eye === 'string' && /^#[0-9a-fA-F]{6}$/.test(o.eye)) selectEye(o.eye);
+    if (o && typeof o.color === 'string') setColor(o.color, true);
+    if (o && typeof o.size === 'number' && [3, 6, 12, 22].indexOf(o.size) >= 0) setSize(o.size);
+    if (o && typeof o.opacity === 'number' && o.opacity >= 5 && o.opacity <= 100) {
+      state.opacity = Math.round(o.opacity / 5) * 5;
+      $('opacity').value = state.opacity;
+      $('opacityVal').textContent = state.opacity + '%';
+    }
+    if (o && Object.prototype.toString.call(o.history) === '[object Array]') {
+      o.history.forEach(function (h) {
+        if (typeof h === 'string' && /^#[0-9a-fA-F]{6}$/.test(h)) pushHistoryRaw(h);
+      });
+      renderHistory();
+    }
     if (o && typeof o.p === 'string' && o.p.indexOf('data:image') === 0) {
       var img = new Image();
-      img.onload = function () {
-        pctx.clearRect(0, 0, W, H);
-        pctx.drawImage(img, 0, 0);
-        composite();
-      };
+      img.onload = function () { pctx.clearRect(0, 0, W, H); pctx.drawImage(img, 0, 0); composite(); };
       img.onerror = function () { };
       img.src = o.p;
     }
-  } catch (e) { /* битый JSON — ignore silently */ }
+  } catch (e) { }
 }
 
-/* ---------- UI ---------- */
+/* ---------- UI state ---------- */
 function setTool(t) {
   state.tool = t;
   var map = { brush: 'toolBrush', eraser: 'toolEraser', fill: 'toolFill', picker: 'toolPicker' };
   for (var k in map) $(map[k]).classList.toggle('active', k === t);
 }
-function setColor(hex) {
-  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
-  state.color = hex.toLowerCase();
-  $('customColor').value = state.color;
-  refreshSwatches();
+function setSize(s) {
+  state.size = s;
+  var btns = document.querySelectorAll('.sbtn');
+  for (var j = 0; j < btns.length; j++)
+    btns[j].classList.toggle('active', parseInt(btns[j].getAttribute('data-sz'), 10) === s);
 }
-function setEye(hex) { selectEye(hex); }
-function selectEye(hex) {
-  state.eye = hex;
-  composite(); schedulePersist(); refreshSwatches();
+function pushHistoryRaw(hex) {
+  if (history[0] === hex) return;
+  var idx = history.indexOf(hex);
+  if (idx >= 0) history.splice(idx, 1);
+  history.unshift(hex);
+  if (history.length > HIST_MAX) history.pop();
 }
-
-var paintSw = [], eyeSw = [];
-function buildPalettes() {
-  var host = $('palGroups');
-  D.palettes.forEach(function (pal) {
-    var g = document.createElement('div');
-    var h = document.createElement('div'); h.className = 'hdr'; h.textContent = pal.name;
-    var r = document.createElement('div'); r.className = 'swrow';
-    pal.colours.forEach(function (hex) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'sw';
-      b.style.background = hex;
-      b.title = pal.name + ' ' + hex;
-      b.addEventListener('click', function () { setColor(hex); });
-      r.appendChild(b);
-      paintSw.push({ el: b, hex: hex.toLowerCase() });
-    });
-    g.appendChild(h); g.appendChild(r);
-    host.appendChild(g);
-  });
-  /* отдельная группа «Цвет глаз» — свотчи глазной палитры (id 7) */
-  var eyePal = null;
-  D.palettes.forEach(function (p) { if (p.id === 7) eyePal = p; });
-  if (!eyePal) eyePal = D.palettes[D.palettes.length - 1];
-  var er = $('eyeGroup');
-  eyePal.colours.forEach(function (hex) {
+function renderHistory() {
+  var row = $('histRow');
+  row.innerHTML = '';
+  $('histEmpty').style.display = history.length ? 'none' : 'inline';
+  history.slice(0, HIST_MAX).forEach(function (h) {
     var b = document.createElement('button');
-    b.type = 'button'; b.className = 'sw';
-    b.style.background = hex;
-    b.title = eyePal.name + ' ' + hex + ' (цвет глаз)';
-    b.addEventListener('click', function () { selectEye(hex.toLowerCase()); });
-    er.appendChild(b);
-    eyeSw.push({ el: b, hex: hex.toLowerCase() });
+    b.type = 'button';
+    b.className = 'sw' + (h === state.color ? ' active' : '');
+    b.style.background = h;
+    b.title = h;
+    b.addEventListener('click', function () { setColor(h); });
+    row.appendChild(b);
   });
 }
-function refreshSwatches() {
-  paintSw.forEach(function (s) { s.el.classList.toggle('active', s.hex === state.color); });
-  var eyeActive = false;
-  eyeSw.forEach(function (s) {
-    var on = state.eye && s.hex === state.eye;
-    if (on) eyeActive = true;
-    s.el.classList.toggle('active', !!on);
-  });
-  $('btnEyeReset').classList.toggle('active', !state.eye);
+function setColor(hex, skipHistory) {
+  hex = String(hex || '').toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(hex)) return;
+  var changed = hex !== state.color;
+  if (changed) state.prevColor = state.color;
+  state.color = hex;
+  $('hexIn').value = hex;
+  $('curColor').style.background = hex;
+  $('prevColor').style.background = state.prevColor;
+  if (changed) {
+    if (skipHistory !== true) pushHistoryRaw(hex);
+    setHSVfromHex(hex);
+    renderHistory();
+    if (skipHistory !== true) schedulePersist();
+  }
 }
 
-function setBase(kind) { state.base = kind; composite(); }
-function setLine(on) { state.line = !!on; composite(); }
+/* ---------- HSV-пикер: квадрат + полоса ---------- */
+var hsv = { h: 34, s: 0.15, v: 0.96 };
+var svCv = $('svSquare'), svCtx = svCv.getContext('2d');
+var hueCv = $('hueBar'), hueCtx = hueCv.getContext('2d');
+function hsvCss(h, s, v) {
+  var c = hsv2rgb(h, s, v);
+  return 'rgb(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ')';
+}
+function setHSVfromHex(hex) {
+  var c = hexRGB(hex);
+  if (!c) return;
+  var m = rgb2hsv(c.r, c.g, c.b);
+  hsv = { h: m.h, s: m.s, v: m.v };
+  drawSV(); drawHue();
+}
+function drawSV() {
+  var w = svCv.width, h = svCv.height;
+  svCtx.fillStyle = hsvCss(hsv.h, 1, 1);
+  svCtx.fillRect(0, 0, w, h);
+  var g = svCtx.createLinearGradient(0, 0, w, 0);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  svCtx.fillStyle = g; svCtx.fillRect(0, 0, w, h);
+  g = svCtx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,1)');
+  svCtx.fillStyle = g; svCtx.fillRect(0, 0, w, h);
+  var cx = hsv.s * w, cy = (1 - hsv.v) * h;
+  svCtx.beginPath(); svCtx.arc(cx, cy, 6, 0, Math.PI * 2);
+  svCtx.strokeStyle = hsv.v > 0.55 ? 'rgba(20,20,26,.9)' : 'rgba(255,255,255,.95)';
+  svCtx.lineWidth = 2; svCtx.stroke();
+}
+function drawHue() {
+  var w = hueCv.width, h = hueCv.height;
+  var g = hueCtx.createLinearGradient(0, 0, w, 0);
+  for (var k = 0; k <= 6; k++) g.addColorStop(k / 6, hsvCss(k * 60, 1, 1));
+  hueCtx.fillStyle = g; hueCtx.fillRect(0, 0, w, h);
+  var cx = ((hsv.h % 360) / 360) * w;
+  hueCtx.strokeStyle = 'rgba(255,255,255,.95)';
+  hueCtx.lineWidth = 2;
+  hueCtx.beginPath(); hueCtx.moveTo(cx, 0); hueCtx.lineTo(cx, h); hueCtx.stroke();
+}
+function setHSV(h, s, v) {
+  hsv.h = ((h % 360) + 360) % 360;
+  hsv.s = Math.max(0, Math.min(1, s));
+  hsv.v = Math.max(0, Math.min(1, v));
+  var c = hsv2rgb(hsv.h, hsv.s, hsv.v);
+  setColor(rgbHex(c.r, c.g, c.b));
+}
+function bindPicker(cv, apply) {
+  var ptr = null;
+  function pt(e) {
+    var r = cv.getBoundingClientRect();
+    var x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    var y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+    apply(x, y);
+  }
+  cv.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    ptr = e.pointerId;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { }
+    pt(e);
+  });
+  cv.addEventListener('pointermove', function (e) { if (ptr === e.pointerId) pt(e); });
+  function up(e) { if (ptr === e.pointerId) ptr = null; }
+  cv.addEventListener('pointerup', up);
+  cv.addEventListener('pointercancel', up);
+}
+bindPicker(svCv, function (x, y) { setHSV(hsv.h, x, 1 - y); });
+bindPicker(hueCv, function (x, y) { setHSV(x * 360, hsv.s, hsv.v); });
 
-/* ---------- указатель ---------- */
+/* ---------- указатель на холсте ---------- */
 function artPoint(e) {
   var r = work.getBoundingClientRect();
   return {
@@ -546,20 +653,18 @@ function artPoint(e) {
   };
 }
 var activePtr = null;
-
 work.addEventListener('pointerdown', function (e) {
-  e.preventDefault();                       /* запрет скролла/жестов при рисовании */
+  e.preventDefault();
   if (activePtr !== null) return;
   var p = artPoint(e);
-  var ax = Math.floor(p.x), ay = Math.floor(p.y);
   if (state.tool === 'brush' || state.tool === 'eraser') {
     activePtr = e.pointerId;
     try { work.setPointerCapture(e.pointerId); } catch (err) { }
     liveBegin(p.x, p.y);
   } else if (state.tool === 'fill') {
-    floodFillAt(ax, ay);
+    floodFillAt(Math.floor(p.x), Math.floor(p.y));
   } else if (state.tool === 'picker') {
-    pickAt(ax, ay);
+    pickAt(Math.floor(p.x), Math.floor(p.y));
   }
 });
 work.addEventListener('pointermove', function (e) {
@@ -583,57 +688,53 @@ $('toolBrush').onclick = function () { setTool('brush'); };
 $('toolEraser').onclick = function () { setTool('eraser'); };
 $('toolFill').onclick = function () { setTool('fill'); };
 $('toolPicker').onclick = function () { setTool('picker'); };
-var szBtns = document.querySelectorAll('#sizes .sz');
+var szBtns = document.querySelectorAll('.sbtn');
 for (var szi = 0; szi < szBtns.length; szi++) {
   (function (b) {
-    b.onclick = function () {
-      state.size = parseInt(b.getAttribute('data-sz'), 10);
-      for (var j = 0; j < szBtns.length; j++) szBtns[j].classList.toggle('active', szBtns[j] === b);
-    };
+    b.onclick = function () { setSize(parseInt(b.getAttribute('data-sz'), 10)); schedulePersist(); };
   })(szBtns[szi]);
 }
 $('opacity').addEventListener('input', function () {
   state.opacity = parseInt(this.value, 10);
   $('opacityVal').textContent = state.opacity + '%';
+  schedulePersist();
 });
 $('btnUndo').onclick = doUndo;
 $('btnRedo').onclick = doRedo;
 $('btnClear').onclick = clearPaint;
-$('btnEyeReset').onclick = function () { selectEye(null); };
-$('customColor').addEventListener('input', function () { setColor(this.value); });
-
-var radios = document.getElementsByName('baseKind');
-for (var ri = 0; ri < radios.length; ri++) {
-  radios[ri].addEventListener('change', function () { setBase(this.value); });
-}
-$('lineOn').addEventListener('change', function () { setLine(this.checked); });
+$('hexIn').addEventListener('input', function () { setColor(this.value); });
+$('hexIn').addEventListener('blur', function () { this.value = state.color; });
+$('prevColor').addEventListener('click', function () { setColor(state.prevColor); });
 
 window.addEventListener('keydown', function (e) {
   var tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   var mod = e.ctrlKey || e.metaKey;
   var k = (e.key || '').toLowerCase();
-  if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) doRedo(); else doUndo(); }
-  else if (mod && k === 'y') { e.preventDefault(); doRedo(); }
+  if (mod && k === 'z') { if (e.shiftKey) doRedo(); else doUndo(); }
+  else if (mod && k === 'y') { doRedo(); }
+  else if (!mod && k === '1') setTool('brush');
+  else if (!mod && k === '2') setTool('eraser');
+  else if (!mod && k === '3') setTool('fill');
+  else if (!mod && k === '4') setTool('picker');
 });
 
 /* ---------- экспорт ---------- */
 function download(canvas, name) {
   var a = document.createElement('a');
   a.download = name;
-  a.href = canvas.toDataURL('image/png'); /* PNG RGBA: кот с прозрачным фоном вне силуэта (у work), у слоя краски — прозрачность вне клипа */
+  a.href = canvas.toDataURL('image/png');
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 }
-$('btnExpWork').onclick = function () { download(work, 'kns-paint-sit.png'); };
-$('btnExpPaint').onclick = function () { download(clipCv, 'kns-paint-layer.png'); };
+$('btnExpWork').onclick = function () { download(work, 'kns-paint.png'); };
+$('btnExpPaint').onclick = function () { download(paintCv, 'kns-paint-layer.png'); };
 
 /* ============================================================
-   SELFTEST (?selftest=1) — программные пиксельные проверки
+   SELFTEST (?selftest=1)
    ============================================================ */
 var SELFTESTS = window.__PAINT_TEST = {};
-
 function snapWork() { return wctx.getImageData(0, 0, W, H); }
 function dataEqual(a, b) {
   if (a.width !== b.width || a.height !== b.height) return false;
@@ -641,225 +742,145 @@ function dataEqual(a, b) {
   for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
   return true;
 }
-function diffStats(A, B) {
-  var a = A.data, b = B.data, r = { changed: 0, outSil: 0, inEyes: 0, onDark: 0 };
-  for (var i = 0; i < W * H; i++) {
-    var o = i * 4;
-    if (a[o] !== b[o] || a[o + 1] !== b[o + 1] || a[o + 2] !== b[o + 2] || a[o + 3] !== b[o + 3]) {
-      r.changed++;
-      if (!silArr[i]) r.outSil++;
-      if (eyeArr[i]) r.inEyes++;
-      if (darkArr[i]) r.onDark++;
-    }
-  }
-  return r;
+function diffPx(A, B, i) {
+  var a = A.data, b = B.data, o = i * 4;
+  return Math.abs(a[o] - b[o]) + Math.abs(a[o + 1] - b[o + 1]) +
+    Math.abs(a[o + 2] - b[o + 2]) + Math.abs(a[o + 3] - b[o + 3]);
 }
-function luminosity(d, i) { var o = i * 4; return (d[o] + d[o + 1] + d[o + 2]) / 3; }
-
 function runSelfTest() {
   var lines = [], pass = 0, total = 0;
   function rec(name, ok, detail) {
     total++;
     if (ok) pass++;
     SELFTESTS[name] = [ok, detail];
-    var line = name + ' ' + (ok ? 'ok' : 'FAIL') + (detail ? ' — ' + detail : '');
-    lines.push(line);
-    try { console.log(line); } catch (e) { }
+    lines.push(name + ' ' + (ok ? 'ok' : 'FAIL') + (detail ? ' — ' + detail : ''));
   }
 
-  /* --- префикс: детерминированное состояние --- */
   undoStack.length = 0; redoStack.length = 0;
   pctx.clearRect(0, 0, W, H);
-  state.eye = null; state.base = 'gray'; state.line = true;
   composite();
+  var A, B;
 
-  var A, B, st;
+  rec('ST1', assets.base.complete && assets.base.naturalWidth === W, 'скетч ' + W + '×' + H);
 
-  /* ST1: декодирование ассетов */
-  var st1ok = assets.base.complete && assets.base.naturalWidth === W &&
-    assets.mannequin.complete && assets.mannequin.naturalWidth === W &&
-    assets.lineart.complete && assets.lineart.naturalWidth === W;
-  rec('ST1', st1ok, 'base/mannequin/lineart загружены ' + W + '×' + H);
-
-  /* ST2: манекен не выходит за силуэт (union зон) */
-  var outOpaque = 0;
-  var md = mnData.data;
-  for (var i = 0; i < W * H; i++) {
-    if (md[i * 4 + 3] > 0 && !zoneUnionHave(i)) outOpaque++;
-  }
-  rec('ST2', outOpaque === 0, 'непрозрачных пикселей вне силуэта (union зон): ' + outOpaque);
-
-  /* ST3: мазок клипается по силуэту + undo байт-в-байт */
+  /* ST2: СВОБОДНАЯ кисть красит и ВНЕ кота (клипа нет) + undo */
   A = snapWork();
-  var before = pctx.getImageData(0, 0, W, H);
-  strokeLine(45, 100, 240, 100, { size: 2, color: '#ff0000', opacity: 100 });
+  strokeLine(8, 8, 8, 120, { size: 6, color: '#00ccff', opacity: 100 });
   B = snapWork();
-  st = diffStats(A, B);
-  var rawPaint = diffStats(before, pctx.getImageData(0, 0, W, H)).changed;
+  var air = 0;
+  for (var i2 = 0; i2 < W * H; i2++) if (diffPx(A, B, i2) > 0 && !silArr[i2]) air++;
+  var undoOk2 = doUndo() && dataEqual(snapWork(), A);
+  rec('ST2', air > 150 && undoOk2, 'мазок мимо кота: ' + air + ' px закрашено в воздухе, undo байт-в-байт: ' + undoOk2);
+
+  /* ST3: полупрозрачный мазок = лерп база→цвет по alpha */
+  strokeLine(60, 62, 68, 62, { size: 3, color: '#6fa8ff', opacity: 50 });
+  B = snapWork();
+  var o3 = (62 * W + 64) * 4;
+  var ex3 = {
+    r: A.data[o3] * 0.5 + 111 * 0.5,
+    g: A.data[o3 + 1] * 0.5 + 168 * 0.5,
+    b: A.data[o3 + 2] * 0.5 + 255 * 0.5
+  };
+  var ok3 = Math.abs(B.data[o3] - ex3.r) <= 6 &&
+    Math.abs(B.data[o3 + 1] - ex3.g) <= 6 &&
+    Math.abs(B.data[o3 + 2] - ex3.b) <= 6;
   var undoOk3 = doUndo() && dataEqual(snapWork(), A);
-  var st3ok = st.outSil === 0 && st.changed > 95 && rawPaint > 200 && undoOk3;
-  rec('ST3', st3ok, 'дифф композита ' + st.changed + ' px, 0 вне силуэта; сырое покрытие мазка ' +
-    rawPaint + ' px (>200); undo байт-в-байт: ' + undoOk3);
+  rec('ST3', ok3 && undoOk3, 'мазок 50%: px≈лерп(base,цвет)±6 — ' + ok3 + '; undo: ' + undoOk3);
 
-  /* ST4: мазок size4 по глазам — глаза не изменяются */
-  var ecnt = 0, nonEye = 0;
-  var offs4 = brushMask(4);
-  for (var q = 0; q < offs4.length; q++) {
-    var ex = 26 + offs4[q][0], ey = 43 + offs4[q][1];
-    var ei = ey * W + ex;
-    if (ex < 0 || ey < 0 || ex >= W || ey >= H) continue;
-    if (eyeArr[ei]) ecnt++;
-    else if (silArr[ei]) nonEye++;
-  }
+  /* ST4: заливка similarity — светлое тело заливается, тёмный контур и глаз НЕ заливаются */
   A = snapWork();
-  strokeLine(26, 43, 26, 43, { size: 4, color: '#00ff00', opacity: 100 });
+  var n4 = floodFillAt(152, 100, { color: '#00aa00', opacity: 100 });
   B = snapWork();
-  st = diffStats(A, B);
-  var st4ok = st.inEyes === 0 && (st.changed - st.inEyes) > 0 && st.outSil === 0;
+  var fillCnt = 0;
+  for (var i4 = 0; i4 < W * H; i4++) if (diffPx(A, B, i4) > 0) fillCnt++;
+  var eyeO = (45 * W + 34) * 4;
+  var eyeGreen = B.data[eyeO] < 100 && B.data[eyeO + 1] > 120 && B.data[eyeO + 2] < 100;
   var undoOk4 = doUndo() && dataEqual(snapWork(), A);
-  rec('ST4', st4ok && undoOk4, 'мазок size4 в (26,43): накрыл глаза ' + ecnt + ' px и шерсть ' + nonEye +
-    ' px; в глазах изменено 0, вне глаз ' + (st.changed - st.inEyes) + ' px; undo байт-в-байт: ' + undoOk4);
+  rec('ST4', n4 > 9000 && n4 === fillCnt && !eyeGreen && undoOk4,
+    'заливка тела (152,100): ' + n4 + 'px; глаз НЕ тронут: ' + !eyeGreen + '; undo: ' + undoOk4);
 
-  /* ST5: заливка тела + undo */
+  /* ST5: глаза красятся кистью поверх (никаких барьеров) */
   A = snapWork();
-  var fillWorked = floodFillAt(100, 110, { color: '#00aa00', opacity: 100 });
+  strokeLine(33, 44, 40, 48, { size: 6, color: '#ff00d0', opacity: 100 });
   B = snapWork();
-  st = diffStats(A, B);
-  var st5ok = fillWorked && st.changed > 3000 && st.changed < W * H && st.outSil === 0 &&
-    st.inEyes === 0 && st.onDark === 0;
+  var o5 = (45 * W + 36) * 4;
+  var eyeOk = Math.abs(B.data[o5] - 255) < 12 && Math.abs(B.data[o5 + 1]) < 12 &&
+              Math.abs(B.data[o5 + 2] - 208) < 15;
   var undoOk5 = doUndo() && dataEqual(snapWork(), A);
-  rec('ST5', st5ok && undoOk5, 'заливка (100,110) #00aa00: ' + st.changed + ' px (>3000, всё тело скетча единым пятном до контура), в глазах 0, на контуре 0, вне силуэта 0; undo байт-в-байт: ' + undoOk5);
+  rec('ST5', eyeOk && undoOk5, 'мазок по зрачку: px≈#ff00d0 — ' + eyeOk + '; undo: ' + undoOk5);
 
-  /* ST6: оригинальная база-скетч, краска та же, глаза нетронуты */
-  strokeLine(80, 90, 160, 90, { size: 3, color: '#0000ff', opacity: 100 }); /* краска для проверки */
-  var compErr = null;
-  try { setBase('gold'); } catch (err) { compErr = err; }
-  var eyeBytesOk = true, eyeChanged = 0;
-  var bd = baseImageData.data, wd = (function () { return wctx.getImageData(0, 0, W, H).data; })();
-  for (var e3 = 0; e3 < eyesIdx.length; e3++) {
-    var o3 = eyesIdx[e3] * 4;
-    if (wd[o3] !== bd[o3] || wd[o3 + 1] !== bd[o3 + 1] || wd[o3 + 2] !== bd[o3 + 2] || wd[o3 + 3] !== bd[o3 + 3]) {
-      eyeBytesOk = false; eyeChanged++;
-    }
-  }
-  var clipAll = 0, clipOut = 0, clipEye = 0;
-  var cd = cctx.getImageData(0, 0, W, H).data;
-  for (var ci = 0; ci < W * H; ci++) {
-    if (cd[ci * 4 + 3] > 0) {
-      clipAll++;
-      if (!silArr[ci]) clipOut++;
-      if (eyeArr[ci]) clipEye++;
-    }
-  }
-  var st6ok = compErr === null && eyeBytesOk && clipOut === 0 && clipEye === 0 && clipAll > 0;
-  rec('ST6', st6ok, 'оригинал-скетч как база: композит без ошибок' + (compErr ? ' ОШИБКА:' + compErr : '') +
-    '; clip-краска ' + clipAll + ' px вся внутри силуэта (вне: ' + clipOut + '), глаза в clip: ' + clipEye +
-    '; eyes байт-в-байт = золотая база: ' + eyeBytesOk);
+  /* ST6: история цветов */
+  var hBefore = history.length;
+  setColor('#123456');
+  setColor('#123456');
+  setColor('#abcdef');
+  var dup = history.indexOf('#123456') !== history.lastIndexOf('#123456');
+  var ok6 = history.indexOf('#123456') >= 0 && history[0] === '#abcdef' && !dup;
+  rec('ST6', ok6, 'история: +' + (history.length - hBefore) + ', без дублей, top #abcdef');
+  setColor('#f5e5ce');
 
-  /* ST7: цвет глаз */
-  var bdd = baseImageData.data;
-  var dc7 = eyeDarkCenter(bdd);
-  var coreIdx = [];
-  for (var e7 = 0; e7 < eyesIdx.length; e7++) {
-    var ii7 = eyesIdx[e7];
-    if (Math.abs(ii7 % W - dc7.cx) <= 1 && Math.abs((ii7 - ii7 % W) / W - dc7.cy) <= 1 &&
-        (bdd[ii7 * 4] + bdd[ii7 * 4 + 1] + bdd[ii7 * 4 + 2]) / 3 < 90) coreIdx.push(ii7);
-  }
-  A = snapWork();
-  selectEye('#FCDF00');
-  B = snapWork();
-  st = diffStats(A, B);
-  var coreDarkSaved = true;
-  for (var e5 = 0; e5 < coreIdx.length; e5++) if (luminosity(B.data, coreIdx[e5]) >= 90) coreDarkSaved = false;
-  var st7ok = st.inEyes > 0 && st.changed === st.inEyes && coreIdx.length >= 1 && coreDarkSaved;
-  rec('ST7', st7ok, 'глаза #FCDF00: перекрашено ' + st.inEyes + ' из ' + eyesIdx.length +
-    ' px, дифф вне глаз ' + (st.changed - st.inEyes) + ', зрачок-ядро ' + coreIdx.length + ' px остался тёмным: ' + coreDarkSaved);
-
-  /* ST8: экспорт */
+  /* ST7: экспорт */
   var url = work.toDataURL('image/png');
-  rec('ST8', url.indexOf('data:image/png') === 0 && url.length > 2000,
-    'PNG dataURL: ' + url.length + ' симв. (префикс data:image/png, ' + work.width + '×' + work.height + ')');
+  rec('ST7', url.indexOf('data:image/png') === 0 && url.length > 2000, 'PNG dataURL ' + url.length + ' симв.');
 
-  /* ST9: persist (структура ключа, без перезагрузки) */
+  /* ST8: persist */
   persistNow();
-  var err9 = null, savedOk = false, len9 = 0;
+  var ok8 = false, len8 = 0;
   try {
-    var raw = localStorage.getItem(KEY);
-    var o = raw ? JSON.parse(raw) : null;
-    if (o && typeof o.p === 'string' && o.p.indexOf('data:image/png') === 0 &&
-        ('eye' in o) && (o.eye === null || typeof o.eye === 'string')) {
-      savedOk = true; len9 = o.p.length;
-    }
-  } catch (err) { err9 = err; }
-  rec('ST9', savedOk && !err9, 'localStorage "' + KEY + '": {p: dataURL ' + len9 + ' симв., eye: ' +
-    (state.eye || 'null') + '} — структура живая');
+    var raw8 = localStorage.getItem(KEY);
+    var o8 = raw8 ? JSON.parse(raw8) : null;
+    if (o8 && typeof o8.p === 'string' && o8.p.indexOf('data:image/png') === 0) { ok8 = true; len8 = o8.p.length; }
+  } catch (err) { }
+  rec('ST8', ok8, 'localStorage сохранён, краска ' + len8 + ' симв.');
 
-  /* --- финал: чистое состояние --- */
   undoStack.length = 0; redoStack.length = 0;
   pctx.clearRect(0, 0, W, H);
-  state.eye = null; state.base = 'gray'; state.line = true;
-  composite(); persistNow();
-  updateUndoUI();
+  composite(); persistNow(); updateUndoUI();
 
-  var out = lines.join('\n');
-  document.getElementById('selftest').textContent = out + '\n' +
-    (pass === total ? 'PASS ' + pass + '/' + total : 'FAILED ' + pass + '/' + total);
-}
-
-/* helper для ST2: union всех зон */
-function zoneUnionHave(i) {
-  if (!runSelfTest._zu) {
-    var u = new Uint8Array(W * H);
-    for (var z in D.zones) {
-      var li = D.zones[z];
-      for (var k = 0; k < li.length; k++) u[li[k]] = 1;
-    }
-    runSelfTest._zu = u;
-  }
-  return runSelfTest._zu[i] === 1;
+  document.getElementById('selftest').textContent =
+    lines.join('\n') + '\n' + (pass === total ? 'PASS ' + pass + '/' + total : 'FAILED ' + pass + '/' + total);
+  document.getElementById('selftest').style.display = 'block';
 }
 
 /* ---------- инициализация ---------- */
-var pending = 3;
-function assetReady() {
-  if (--pending === 0) {
-    buildMasks();
-    composite();
-    tryRestore();
-    refreshSwatches();
-    if (/[?&]selftest=1/.test(location.search)) runSelfTest();
-  }
+function ready() {
+  buildBase();
+  composite();
+  tryRestore();
+  renderHistory();
 }
-assets.base.onload = assetReady; assets.mannequin.onload = assetReady; assets.lineart.onload = assetReady;
-assets.base.onerror = assets.mannequin.onerror = assets.lineart.onerror = assetReady;
+assets.base.onload = ready;
+assets.base.onerror = function () { };
 
-/* фон страницы и холстов — из PAINT_DATA */
-document.body.style.backgroundImage =
-  'linear-gradient(180deg, rgba(20,26,8,.28), rgba(20,26,8,.42)), url("' + D.field.page + '")';
-document.body.style.backgroundSize = 'cover, 1100px auto';
-work.style.backgroundImage = 'url("' + D.field.canvas + '")';
-field.style.backgroundImage = 'url("' + D.field.canvas + '")';
-
-buildPalettes();
+setColor('#f5e5ce', true);
+drawSV(); drawHue();
+if (/[?&]selftest=1/.test(location.search)) {
+  var stWait = setInterval(function () {
+    if (silArr) { clearInterval(stWait); runSelfTest(); }
+  }, 100);
+  setTimeout(function () { clearInterval(stWait); }, 10000);
+}
 
 window.PAINT = {
   W: W, H: H,
   state: state,
   assets: assets,
-  work: work, field: field,
-  paintCanvas: paintCv, clipCanvas: clipCv, eyeMaskCanvas: eyeMaskCv, eyeTintCanvas: eyeTintCv,
+  work: work,
+  paintCanvas: paintCv,
   baseImageData: function () { return baseImageData; },
   stroke: strokeLine,
-  dab: dab,
+  liveBegin: liveBegin, liveMove: liveMove, liveEnd: liveEnd,
+  activePointer: function () { return activePtr; },
   floodFill: floodFillAt,
+  pickAt: pickAt,
   undo: doUndo, redo: doRedo,
   clearPaint: clearPaint,
-  setEye: setEye, setBase: setBase, setLine: setLine,
+  setColor: setColor,
+  history: function () { return history.slice(); },
   composite: composite,
   persistNow: persistNow,
-  masks: { sil: function () { return silArr; }, dark: function () { return darkArr; }, eyes: function () { return eyeArr; } },
-  runSelfTest: runSelfTest,
-  eyesIdx: eyesIdx
+  masks: { sil: function () { return silArr; }, dark: function () { return darkArr; } },
+  runSelfTest: runSelfTest
 };
 })();
 </script>
