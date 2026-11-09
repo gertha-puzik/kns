@@ -1,0 +1,18 @@
+---
+description: query-first navigation via the optional local graphify graph
+alwaysApply: true
+---
+
+# graphify: query the graph before grepping
+
+- This repo may have a local context graph at `graphify-out/graph.json` (built
+  by graphify: tree-sitter AST, no LLM, deterministic). It is PER-CLONE and may
+  be missing on your machine — cloud sandboxes without Python/uv will not have
+  it. If it is missing, fall back to the maps in README.md / KNS-CONTEXT.md and
+  normal grep; do not install anything on remote sandboxes.
+- When present, prefer `graphify query` / `graphify path` / `graphify affected`
+  over re-reading whole files — it cuts context tokens. Verify every located
+  `file:line` against the actual source before editing: the graph is a hint,
+  not truth.
+- Never commit `graphify-out/` (gitignored per-clone artifact) and never put
+  graph builds into CI.

@@ -1,7 +1,7 @@
 # KNS — конструктор окрасов для coop-field
 
 Прототип редактора окрасов (KNS, «конструктор няшных скинов») для игры
-[coop-field / abnocw](https://abnocw.miew.ru) (организация
+[coop-field / abnocw](https://abnocw.phainonsmilk.ru) (организация
 [gertha-puzik](https://github.com/gertha-puzik)).
 
 Что здесь лежит:
