@@ -120,15 +120,18 @@
   <div class="bar">
     <div class="status" id="status">Выбери режим боя</div>
     <button class="btn ghost" id="btnRedraw">⟲ пере-рисовать <span style="opacity:.6">[R]</span></button>
+    <button class="btn ghost" id="btnSound" title="звук вкл/выкл">🔊</button>
     <button class="btn ghost" id="btnMenu">в меню</button>
   </div>
 
   <details class="rules">
     <summary>Как это работает</summary>
-    <p>Каждый кот <b>рисует мышкой траекторию удара</b> по чужому коту. Когда оба нарисовали — бой воспроизводится.</p>
-    <p>🤝 <b>Пересеклись траектории — блок.</b> Лапа упирается в чужую траекторию и дальше не летит: оба удара сбиты, никому ничего.</p>
-    <p>💥 <b>Не пересеклись — попадание:</b> если конец траектории дошёл до кота — ему −1 рыбка. Могут попасть и оба сразу.</p>
-    <p>🏆 Кто первым снимет с чужого кота все <b>3 рыбки</b> — тот подъебал. Раунды повторяются, траектории каждый раз новые.</p>
+    <p>Каждый кот <b>рисует мышкой траекторию удара</b> по чужому коту. Когда оба нарисовали — бой воспроизводится. Летят обе лапы.</p>
+    <p>🤝 <b>Пересеклись траектории — блок:</b> в режиме «по ТЗ» пересечение всегда сбивает оба удара.</p>
+    <p>⏱ <b>Режим «тайминг»:</b> блок только если лапы у точки пересечения <b>почти одновременно</b> (окно ~115 мс). Кто пришёл раньше — <b>парирует</b>: вражеский удар сбит, свой доезжает. Идеальный синхрон (Δ&lt;25 мс) — лязг, сбиты оба. Разминулись по времени — оба удара летят дальше.</p>
+    <p>💥 <b>Попадание:</b> конец траектории дошёл до кота — ему −1 рыбка. Могут попасть и оба сразу.</p>
+    <p>📏 <b>Точки на мазке</b> — метки времени полёта: каждая точка = +100 мс. Длиннее замах — позже прилёт.</p>
+    <p>🏆 Кто первым снимет с чужого кота все <b>3 рыбки</b> — тот подъебал.</p>
   </details>
 </div>
 
@@ -166,6 +169,8 @@ const MIN_TRAJ=60;
 const WALK_MS=280;
 const BASE_HP=3;
 const EPS=0.05;
+const SYNC_MS=25, PARRY_WIN=115;   // timing: окно синхро-клинча | окно парирования (кто раньше — тот продавил)
+function flightDur(A,B){ return clamp(Math.max(A.total,B.total)/0.52, 620, 2500); } // ~520 px/s на длиннейшей дуге
 
 /* ═══════════════ УТИЛИТЫ ═══════════════ */
 const $=id=>document.getElementById(id);
@@ -279,8 +284,12 @@ function inHitZone(p, catIdx){
 
 /* ═══════════════ РАЗРЕШЕНИЕ РАУНДА (чистая функция) ═══════════════ */
 /* mode 'any'    — по ТЗ: любое геометрическое пересечение траекторий = блок
-   mode 'timing' — блок только если лапы дойдут до точки пересечения одновременно:
-                   длина замаха задаёт «когда» — проскочил мимо точки, удар летит дальше */
+   mode 'timing' — блок это «одновременная встреча лап» с точностью до окна:
+                   пересечение ∩ |Δприлёта| ≤ PARRY_WIN → клинч;
+                   Δ ≤ SYNC_MS       → синхро-клинч: оба сбиты (идеальный лязг);
+                   SYNC_MS < Δ ≤ WIN → ПАРИРОВАНИЕ: кто пришёл в точку раньше —
+                   продавил и доезжает до конца (может и попасть), опоздавший сбит;
+                   Δ > WIN           → разминовка: обе лапы проскочили точку порознь */
 function resolveRound(A,B,mode){
   mode=mode||(S.clinchMode||'any');
   if(mode==='timing') return resolveTiming(A,B);
@@ -294,12 +303,24 @@ function resolveRound(A,B,mode){
   return {type:'hits', hitA:inHitZone(endA,1), hitB:inHitZone(endB,0), endA, endB};
 }
 function resolveTiming(A,B){
-  const STEPS=160, R=26; // лапы — точки \u00d826px; летят равномерно по своим кривым
-  for(let i=0;i<=STEPS;i++){
-    const s=i/STEPS, pa=A.at(s), pb=B.at(s);
-    if(dist(pa,pb)<R){
-      return {type:'clinch', x:{x:(pa.x+pb.x)/2, y:(pa.y+pb.y)/2}, sA:s, sB:s};
-    }
+  const dur=flightDur(A,B);
+  let ev=null;
+  for(const c of crossingsOf(A,B)){
+    const tA=c.sA*dur, tB=c.sB*dur, d=Math.abs(tA-tB);
+    if(d>PARRY_WIN) continue;                       // лапы у точки порознь — разминовка
+    const tc=Math.max(tA,tB);
+    if(!ev||tc<ev.tc) ev={pt:c.pt, sA:c.sA, sB:c.sB, tA, tB, d, tc};
+  }
+  if(ev){
+    const early=ev.tA<=ev.tB?0:1, late=1-early;
+    const endW=(early===0?A:B).at(1);
+    const hitW=(early===0)?inHitZone(endW,1):inHitZone(endW,0);
+    return {type:'clinch',
+      kind: ev.d<=SYNC_MS?'sync':'parry',
+      winner: ev.d<=SYNC_MS?-1:(ev.tA<=ev.tB?0:1), loser: late,
+      deltaMs: ev.d,
+      x:ev.pt, sA:ev.sA, sB:ev.sB,
+      endW, hitW };
   }
   const endA=A.at(1), endB=B.at(1);
   return {type:'hits', hitA:inHitZone(endA,1), hitB:inHitZone(endB,0), endA, endB};
@@ -317,7 +338,7 @@ const S={
   trajs:[null,null],
   pb:null,
   particles:[], floats:[], flashes:[],
-  catAmp:[.1,.1], knock:[0,0],
+  catAmp:[.1,.1], knock:[0,0], squash:[0,0], freeze:null, shake:null, clashAt:0,
   winner:-1, doubleKO:false,
   lastRes:null
 };
@@ -394,15 +415,15 @@ function screenLobby(){
     </div>
     <div class="rules-lobby">
       <b>Правила:</b> каждый рисует мышкой траекторию удара по чужому коту.
-      Траектории <b>пересеклись</b> — блок, оба удара сбиты.
-      <b>Не пересеклись</b> — если конец дошёл до кота, ему −1 🐟. Три рыбки на кота.
+      Траектории <b>пересеклись</b> — блок. <b>Не пересеклись</b> — если конец дошёл до кота, ему −1 🐟.
+      Три рыбки на кота. Точки на мазке — метки времени полёта (каждые +100 мс).
     </div>
     <div class="mode-select">
       <label><input type="radio" name="cMode" value="any" checked>
         <b>по ТЗ:</b> любая пересечёнка = блок</label>
       <label><input type="radio" name="cMode" value="timing">
         <b>тайминг:</b> блок только если лапы бьют одновременно
-        <span class="mode-note">длина замаха = когда прилетишь: короткий мах успевает раньше</span></label>
+        <span class="mode-note">длина замаха = когда прилетишь; в клинче побеждает тот, кто оказался в точке раньше — продавил и доезжает. Идеально синхронно (Δ&lt;25 мс) — лязг, оба сбиты</span></label>
     </div>
     <div class="small"><a id="btnSelftest">прогнать самотест (гейты механики)</a></div>
   </div>`);
@@ -471,7 +492,15 @@ function screenResult(r){
   banner(null);
   const [na,nb]=names();
   let title, sub;
-  if(r.type==='clinch'){ title='КЛИНЧ! БЛОК'; sub='траектории пересеклись — оба удара сбиты'; }
+  if(r.type==='clinch'){
+    if(r.kind==='sync'){ title='СИНХРО-КЛИНЧ! БЛОК'; sub=`Δ ${Math.round(r.deltaMs)} мс — идеальный лязг: оба удара сбиты`; }
+    else if(r.kind==='parry'){
+      const wn=names()[r.winner];
+      if(r.hitW){ title=`${wn} ПАРИРОВАЛ И ПОДЪЕБАЛ!`; sub=`опередил на ${Math.round(r.deltaMs)} мс — удар продавил, минус рыбка`; }
+      else { title=`${wn} ПАРИРОВАЛ!`; sub=`опередил на ${Math.round(r.deltaMs)} мс — вражеский удар сбит, но своего не хватило`; }
+    }
+    else { title='КЛИНЧ! БЛОК'; sub='траектории пересеклись — оба удара сбиты'; }
+  }
   else if(r.hitA&&r.hitB){ title='ОБМЕНЯЛИСЬ!'; sub='обе траектории дошли — каждому −1 🐟'; }
   else if(r.hitA){ title=`${na} подъебал ${nb}!`; sub='удар дошёл — минус рыбка'; }
   else if(r.hitB){ title=`${nb} подъебал ${na}!`; sub='удар дошёл — минус рыбка'; }
@@ -507,6 +536,7 @@ function evPt(ev){
   return {x:(ev.clientX-r.left)*W/r.width, y:(ev.clientY-r.top)*H/r.height};
 }
 cv.addEventListener('pointerdown', ev=>{
+  sfx.unlock();   // WebAudio разрешён только после жеста пользователя
   if(S.phase!=='draw') return;
   ev.preventDefault();
   if(cv.setPointerCapture){ try{ cv.setPointerCapture(ev.pointerId); }catch(e){} }
@@ -515,8 +545,23 @@ cv.addEventListener('pointerdown', ev=>{
 cv.addEventListener('pointermove', ev=>{
   if(S.phase!=='draw'||S.live.length===0) return;
   const p=evPt(ev);
-  if(dist(p, S.live[S.live.length-1])>=3) S.live.push(p);
+  const prev=S.live[S.live.length-1];
+  if(dist(p, prev)>=3) S.live.push(p);
+  if(S.live.length>1) liveSwingStatus();
 });
+/* живой статус замаха: длина дуги + расчётное время полёта (не чаще ~80 мс) */
+let lastSwingStamp=0;
+function liveSwingStatus(){
+  const now=performance.now();
+  if(now-lastSwingStamp<80) return;
+  lastSwingStamp=now;
+  if(S.phase!=='draw'||S.live.length<2) return;
+  let L=0;
+  for(let i=1;i<S.live.length;i++) L+=dist(S.live[i-1],S.live[i]);
+  const dur=clamp(L/0.52, 620, 2500);
+  const [na,nb]=names();
+  status(`<b>${S.drawingPlayer?nb:na}</b>, рисуй удар — замах ${Math.round(L)} px · полёт ~${Math.round(dur)} мс`);
+}
 cv.addEventListener('pointerup', ()=>{
   if(S.phase!=='draw') return;
   const raw=S.live; S.live=[];
@@ -598,11 +643,51 @@ function botPath(acc){
   return pts;
 }
 
+/* ═══════════════ ЗВУК (WebAudio-синтез, без файлов) ═══════════════ */
+const sfx=(()=>{
+  let ac=null, on=true;
+  const ctxOn=()=>{ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ac=null; } } if(ac&&ac.state==='suspended'){ ac.resume(); } return !!ac; };
+  function tone(f0,f1,d,type,vol,delay){
+    if(!on||!ctxOn()) return;
+    try{
+      const t=ac.currentTime+(delay||0), o=ac.createOscillator(), g=ac.createGain();
+      o.type=type; o.frequency.setValueAtTime(f0,t);
+      o.frequency.exponentialRampToValueAtTime(Math.max(1,f1), t+d);
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+d+0.05);
+    }catch(e){}
+  }
+  function noise(d,vol,fc,delay){
+    if(!on||!ctxOn()) return;
+    try{
+      const t=ac.currentTime+(delay||0), n=Math.floor(ac.sampleRate*d), b=ac.createBuffer(1,n,ac.sampleRate), ch=b.getChannelData(0);
+      for(let i=0;i<n;i++) ch[i]=(Math.random()*2-1)*(1-i/n);
+      const s=ac.createBufferSource(); s.buffer=b;
+      const f=ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=fc; f.Q.value=0.8;
+      const g=ac.createGain(); g.gain.value=vol;
+      s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t);
+    }catch(e){}
+  }
+  return {
+    toggle(){ on=!on; return on; },
+    unlock(){ ctxOn(); },
+    clank(){ noise(0.12,0.5,2800); tone(320,180,0.12,'square',0.10); },        // синхро-клинч: лязг
+    parry(){ noise(0.08,0.4,3600); tone(680,900,0.09,'triangle',0.13); },       // парирование: вжух-звон
+    bam(){ tone(170,42,0.16,'sine',0.5); noise(0.09,0.35,700); },              // попадание: бам
+    whiff(){ tone(880,240,0.22,'sine',0.11); },                                 // промах: свист вниз
+    pop(){ tone(520,780,0.07,'sine',0.18); },                                    // рыбка слетела
+    round(){ tone(392,392,0.1,'triangle',0.10); tone(523,523,0.1,'triangle',0.10,0.12); },
+    fanfare(){ [440,554,659,880].forEach((f,i)=>tone(f,f,0.16,'triangle',0.14,i*0.11)); }
+  };
+})();
+$('btnSound').onclick=function(){ const on=sfx.toggle(); this.textContent=on?'🔊':'🔇'; };
+
 /* ═══════════════ ПРОИГРЫВАНИЕ ═══════════════ */
 function startPlayback(t0){
   const A=S.trajs[0], B=S.trajs[1];
   const res=resolveRound(A,B);
-  const dur=clamp(Math.max(A.total,B.total)/0.52, 620, 2500); // ~520 px/s
+  const dur=flightDur(A,B); // ~520 px/s на длиннейшей дуге
   const pb={t0, dur, res, done:false, clashed:0, after:0};
   S.pb=pb;
   S.phase='playback';
@@ -610,20 +695,51 @@ function startPlayback(t0){
   const now=performance.now();
   const delay=ms=>Math.max(0, t0+ms-now);
   const mine=fn=>{ if(S.pb===pb) fn(); };
+  sfx.round();
   if(res.type==='clinch'){
     const tc=Math.max(res.sA,res.sB)*dur;
     setTimeout(()=>mine(()=>{
       if(pb.clashed) return;
       pb.clashed=performance.now();
-      burst(res.x.x,res.x.y, 26, ['#ffffff','#ffd27a','#f5a94b']);
-      floatText('КЛИНЧ!', res.x.x, res.x.y-34);
-      S.catAmp[0]=1.1; S.catAmp[1]=1.1;
-      banner('КЛИНЧ! БЛОК', 1200);
+      S.clashAt=pb.clashed;
+      S.freeze={until:performance.now()+90, now:performance.now()};
+      S.shake={t0:performance.now(), dur:340, amp:9};
+      burst(res.x.x,res.x.y, res.kind==='sync'?26:34, ['#ffffff','#ffd27a','#f5a94b']);
+      if(res.kind==='sync'){
+        floatText('СИНХРО!', res.x.x, res.x.y-34);
+        banner('СИНХРО-КЛИНЧ! БЛОК', 1200);
+        sfx.clank();
+        S.catAmp[0]=1.15; S.catAmp[1]=1.15;
+      } else {
+        const wn=names()[res.winner];
+        floatText(`+${Math.round(res.deltaMs)} мс`, res.x.x, res.x.y-58);
+        floatText('ПАРИРОВАЛ!', res.x.x, res.x.y-34);
+        banner(`${wn.toUpperCase()} ПАРИРОВАЛ!`, 1200);
+        sfx.parry();
+        S.catAmp[res.winner]=0.6; S.knock[res.winner]=0.25;
+      }
     }), delay(tc));
-    setTimeout(()=>mine(()=>{
-      if(pb.done) return;
-      pb.done=true; applyRound(res);
-    }), delay(tc+680));
+    if(res.kind==='parry'){
+      // победитель доезжает: свой момент истины в конце своей дуги
+      setTimeout(()=>mine(()=>{
+        if(pb.after) return;
+        pb.after=performance.now();
+        if(res.hitW){
+          burst(res.endW.x,res.endW.y, 28, [PC[res.winner],'#ffffff','#ff3a00']);
+          floatText('БАМ!', res.endW.x, res.endW.y-62);
+          flash(res.endW.x,res.endW.y);
+          S.freeze={until:performance.now()+80, now:performance.now()};
+          S.shake={t0:performance.now(), dur:360, amp:11};
+          sfx.bam();
+        } else {
+          burst(res.endW.x,res.endW.y, 6, ['#9a9280','#c9c2b0']);
+          sfx.whiff();
+        }
+      }), delay(Math.max(tc+120, dur)));
+      setTimeout(()=>mine(()=>{ if(!pb.done){ pb.done=true; applyRound(res); } }), delay(Math.max(tc+120, dur)+820));
+    } else {
+      setTimeout(()=>mine(()=>{ if(!pb.done){ pb.done=true; applyRound(res); } }), delay(tc+680));
+    }
   } else {
     setTimeout(()=>mine(()=>{
       if(pb.after) return;
@@ -632,23 +748,31 @@ function startPlayback(t0){
       else burst(res.endA.x,res.endA.y, 6, ['#9a9280','#c9c2b0']);
       if(res.hitB){ burst(res.endB.x,res.endB.y, 24, [PC[1],'#ffffff','#4da3ff']); floatText('БАМ!', res.endB.x, res.endB.y-62); flash(res.endB.x,res.endB.y); }
       else burst(res.endB.x,res.endB.y, 6, ['#9a9280','#c9c2b0']);
+      if(res.hitA||res.hitB){
+        S.freeze={until:performance.now()+80, now:performance.now()};
+        S.shake={t0:performance.now(), dur:380, amp:res.hitA&&res.hitB?14:11};
+        sfx.bam();
+      } else { sfx.whiff(); }
       if(!res.hitA&&!res.hitB) floatText('вжух…', (res.endA.x+res.endB.x)/2, Math.min(res.endA.y,res.endB.y)-50);
     }), delay(dur));
-    setTimeout(()=>mine(()=>{
-      if(pb.done) return;
-      pb.done=true; applyRound(res);
-    }), delay(dur+820));
+    setTimeout(()=>mine(()=>{ if(!pb.done){ pb.done=true; applyRound(res); } }), delay(dur+820));
   }
 }
 function applyRound(res){
   if(res.type==='clinch'){
     S.catAmp[0]=Math.max(S.catAmp[0],.8); S.catAmp[1]=Math.max(S.catAmp[1],.8);
     S.knock[0]=.3; S.knock[1]=.3;
+    if(res.kind==='parry'&&res.hitW){
+      const victim=1-res.winner;
+      S.hp[victim]--; syncHp(); sfx.pop();
+      S.squash[victim]=1; S.catAmp[victim]=1.5; S.knock[victim]=1;
+    }
   } else {
-    if(res.hitA){ S.hp[1]--; S.catAmp[1]=1.5; S.knock[1]=1; }
-    if(res.hitB){ S.hp[0]--; S.catAmp[0]=1.5; S.knock[0]=1; }
+    if(res.hitA){ S.hp[1]--; sfx.pop(); S.squash[1]=1; S.catAmp[1]=1.5; S.knock[1]=1; }
+    if(res.hitB){ S.hp[0]--; sfx.pop(); S.squash[0]=1; S.catAmp[0]=1.5; S.knock[0]=1; }
+    syncHp();
   }
-  syncHp();
+  if(S.hp[0]<=0||S.hp[1]<=0) sfx.fanfare();
   screenResult(res);
   render(performance.now());   // опорный кадр итоговой схемы
 }
@@ -660,12 +784,35 @@ function updatePlayback(now){
     const tc=Math.max(res.sA,res.sB)*pb.dur;
     if(!pb.clashed && t>=tc){
       pb.clashed=now;
-      burst(res.x.x,res.x.y, 26, ['#ffffff','#ffd27a','#f5a94b']);
-      floatText('КЛИНЧ!', res.x.x, res.x.y-34);
-      S.catAmp[0]=1.1; S.catAmp[1]=1.1;
-      banner('КЛИНЧ! БЛОК', 1200);
+      S.clashAt=now;
+      S.freeze={until:now+90, now};
+      S.shake={t0:now, dur:340, amp:9};
+      burst(res.x.x,res.x.y, res.kind==='sync'?26:34, ['#ffffff','#ffd27a','#f5a94b']);
+      if(res.kind==='sync'){
+        floatText('СИНХРО!', res.x.x, res.x.y-34);
+        banner('СИНХРО-КЛИНЧ! БЛОК', 1200); sfx.clank();
+        S.catAmp[0]=1.15; S.catAmp[1]=1.15;
+      } else {
+        const wn=names()[res.winner];
+        floatText(`+${Math.round(res.deltaMs)} мс`, res.x.x, res.x.y-58);
+        floatText('ПАРИРОВАЛ!', res.x.x, res.x.y-34);
+        banner(`${wn.toUpperCase()} ПАРИРОВАЛ!`, 1200); sfx.parry();
+      }
     }
-    if(pb.clashed && now-pb.clashed>680 && !pb.done){ pb.done=true; applyRound(res); }
+    if(res.kind==='parry'){
+      const fin=Math.max(tc+120, pb.dur);
+      if(pb.clashed && !pb.after && t>=fin){
+        pb.after=now;
+        if(res.hitW){
+          burst(res.endW.x,res.endW.y, 28, [PC[res.winner],'#ffffff','#ff3a00']);
+          floatText('БАМ!', res.endW.x, res.endW.y-62);
+          flash(res.endW.x,res.endW.y);
+          S.freeze={until:now+80, now}; S.shake={t0:now, dur:360, amp:11};
+          sfx.bam();
+        } else { burst(res.endW.x,res.endW.y, 6, ['#9a9280','#c9c2b0']); sfx.whiff(); }
+      }
+      if(pb.after && now-pb.after>820 && !pb.done){ pb.done=true; applyRound(res); }
+    } else if(pb.clashed && now-pb.clashed>680 && !pb.done){ pb.done=true; applyRound(res); }
   } else {
     if(!pb.after && t>=pb.dur){
       pb.after=now;
@@ -673,6 +820,10 @@ function updatePlayback(now){
       else burst(res.endA.x,res.endA.y, 6, ['#9a9280','#c9c2b0']);
       if(res.hitB){ burst(res.endB.x,res.endB.y, 24, [PC[1],'#ffffff','#4da3ff']); floatText('БАМ!', res.endB.x, res.endB.y-62); flash(res.endB.x,res.endB.y); }
       else burst(res.endB.x,res.endB.y, 6, ['#9a9280','#c9c2b0']);
+      if(res.hitA||res.hitB){
+        S.freeze={until:now+80, now}; S.shake={t0:now, dur:380, amp:res.hitA&&res.hitB?14:11};
+        sfx.bam();
+      } else { sfx.whiff(); }
       if(!res.hitA&&!res.hitB) floatText('вжух…', (res.endA.x+res.endB.x)/2, Math.min(res.endA.y,res.endB.y)-50);
     }
     if(pb.after && now-pb.after>820 && !pb.done){ pb.done=true; applyRound(res); }
@@ -706,6 +857,7 @@ function updateFx(dt){
   for(const i of [0,1]){
     S.catAmp[i]=Math.max(0.1, S.catAmp[i]-0.0011*dt);
     S.knock[i]*=Math.pow(0.993, dt);
+    S.squash[i]=Math.max(0, S.squash[i]-dt/450);   // squash&stretch: колокол ~450 мс
   }
 }
 
@@ -750,12 +902,13 @@ function drawCat(i, now){
   const s=T/catH;
   const fw=img.width*s, fh=img.height*s;
   const x=CATX[i], amp=S.catAmp[i], kn=S.knock[i], dir=(i===0?1:-1);
+  const sq=Math.sin(Math.PI*clamp(S.squash[i],0,1));   // squash&stretch при хите: колокол 0→1→0
   ctx.save();
   ctx.fillStyle='rgba(0,0,0,.22)';
   ctx.beginPath(); ctx.ellipse(x, FLOOR+8, 66, 14, 0, 0, Math.PI*2); ctx.fill();
   ctx.translate(x, FLOOR);
   ctx.rotate(amp*0.05*Math.sin(now*0.014) + kn*0.07*dir*Math.sin(now*0.05));
-  ctx.scale(1+amp*0.03*Math.sin(now*0.017), 1-amp*0.03*Math.cos(now*0.017));
+  ctx.scale((1+amp*0.03*Math.sin(now*0.017))*(1+0.42*sq), (1-amp*0.03*Math.cos(now*0.017))*(1-0.42*sq));
   ctx.translate(-x, -FLOOR);
   ctx.drawImage(img, x-fw/2 - dir*26*kn, FLOOR-fh, fw, fh);
   ctx.restore();
@@ -773,7 +926,29 @@ function drawZoneHint(player, now){
   ctx.stroke();
   ctx.restore();
 }
+/* метки времени полёта: точка каждые 100 мс (крупнее каждые 500) */
+function drawTimeTicks(traj, col, alpha, durOverride){
+  if(!traj||traj.total<40) return;
+  const dur=durOverride||clamp(traj.total/0.52, 620, 2500);
+  const v=traj.total/dur;              // px за мс
+  ctx.save();
+  ctx.globalAlpha=alpha; ctx.fillStyle=col; ctx.strokeStyle=col;
+  for(let ms=100; ms*v<traj.total; ms+=100){
+    const p=traj.at(ms*v/traj.total);
+    const big=(ms%500===0);
+    ctx.beginPath(); ctx.arc(p.x, p.y, big?4.2:2.6, 0, Math.PI*2); ctx.fill();
+    if(big){ ctx.globalAlpha=alpha*0.5; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI*2); ctx.stroke(); }
+  }
+  ctx.restore();
+}
 function render(now){
+  /* shake: экранная тряска с экспоненциальным затуханием */
+  const shk=S.shake && now<S.shake.t0+S.shake.dur ? S.shake : null;
+  if(shk){
+    const k=1-(now-S.shake.t0)/S.shake.dur, a=S.shake.amp*k*k;
+    ctx.save();
+    ctx.translate((Math.random()*2-1)*a, (Math.random()*2-1)*a);
+  }
   /* фон */
   ctx.save();
   ctx.fillStyle=tilePat||'#616517';
@@ -793,6 +968,8 @@ function render(now){
   /* траектории по фазам */
   if(S.phase==='draw'&&S.live.length>1){
     drawZoneHint(S.drawingPlayer, now);
+    const liveTraj=buildTraj(S.live);
+    drawTimeTicks(liveTraj, PC[S.drawingPlayer], 0.8);
     strokeLine(S.live, PC[S.drawingPlayer], 0.95, 7);
   } else if(S.phase==='draw'){
     drawZoneHint(S.drawingPlayer, now);
@@ -803,18 +980,32 @@ function render(now){
     const t=clamp((now-pb.t0)/pb.dur, 0, 1.2);
     strokeLine(S.trajs[0].pts, PC[0], 0.20, 5);
     strokeLine(S.trajs[1].pts, PC[1], 0.20, 5);
-    const pa=(res.type==='clinch')?Math.min(t,res.sA):t;
-    const pbp=(res.type==='clinch')?Math.min(t,res.sB):t;
+    drawTimeTicks(S.trajs[0], '#f5f2e8', 0.30, pb.dur);
+    drawTimeTicks(S.trajs[1], '#f5f2e8', 0.30, pb.dur);
+    let pa=t, pbp=t, fadeA=1, fadeB=1;
+    if(res.type==='clinch'){
+      if(res.kind==='parry'){
+        // опоздавший сбит и гаснет у точки, победитель доезжает до конца
+        if(res.winner===0){ pa=Math.min(t,res.sA); fadeA=1; pbp=Math.min(t,res.sB); fadeB=pawFade(now); }
+        else { pbp=Math.min(t,res.sB); fadeB=1; pa=Math.min(t,res.sA); fadeA=pawFade(now); }
+      } else {
+        pa=Math.min(t,res.sA); pbp=Math.min(t,res.sB);
+        fadeA=pawFade(now); fadeB=fadeA;
+      }
+    }
     strokeTrajPart(S.trajs[0], pa, PC[0], 0.85, 6.5);
     strokeTrajPart(S.trajs[1], pbp, PC[1], 0.85, 6.5);
-    drawPaw(S.trajs[0], pa, PC[0]);
-    drawPaw(S.trajs[1], pbp, PC[1]);
+    drawPaw(S.trajs[0], pa, PC[0], fadeA);
+    drawPaw(S.trajs[1], pbp, PC[1], fadeB);
   }
 
   if((S.phase==='result'||S.phase==='gameover')&&S.trajs[0]&&S.trajs[1]){
-    /* итоговая схема раунда (читаемая, с белой подложкой) */
+    /* итоговая схема раунда (читаемая, с белой подложкой + метки времени) */
+    const fdur=flightDur(S.trajs[0],S.trajs[1]);
     strokeLine(S.trajs[0].pts, PC[0], 0.55, 5, true);
     strokeLine(S.trajs[1].pts, PC[1], 0.55, 5, true);
+    drawTimeTicks(S.trajs[0], '#f5c76a', 0.75, fdur);
+    drawTimeTicks(S.trajs[1], '#f5c76a', 0.75, fdur);
     const r=S.lastRes;
     if(r){
       if(r.type==='clinch') drawCrossMark(r.x.x, r.x.y, now);
@@ -851,17 +1042,25 @@ function render(now){
     ctx.restore();
   }
   ctx.globalAlpha=1;
+  if(shk) ctx.restore();   // закрыть shake-трансформацию
 }
-function drawPaw(traj, s, col){
+function drawPaw(traj, s, col, alpha){
   const p=traj.at(clamp(s,0,1));
+  const a=(alpha===undefined)?1:alpha;
   ctx.save();
-  ctx.globalAlpha=0.35; ctx.fillStyle=col;
+  ctx.globalAlpha=0.35*a; ctx.fillStyle=col;
   ctx.beginPath(); ctx.arc(p.x,p.y,15,0,Math.PI*2); ctx.fill();
-  ctx.globalAlpha=0.9; ctx.fillStyle=col;
+  ctx.globalAlpha=0.9*a; ctx.fillStyle=col;
   ctx.beginPath(); ctx.arc(p.x,p.y,9,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#fff';
+  ctx.globalAlpha=a;
   ctx.beginPath(); ctx.arc(p.x,p.y,4.5,0,Math.PI*2); ctx.fill();
   ctx.restore();
+}
+/* гашение сбитой лапы после клинча: отскок-фейд за ~420 мс */
+function pawFade(now){
+  if(!S.clashAt) return 1;
+  return clamp(1-(now-S.clashAt)/420, 0, 1);
 }
 function drawCrossMark(x,y,now){
   ctx.save();
@@ -878,6 +1077,14 @@ function drawCrossMark(x,y,now){
 
 /* ═══════════════ ЦИКЛ ═══════════════ */
 function loop(now){
+  /* freeze-frame: стоп-кадр на 80–90 мс в моменты удара/клинча */
+  if(S.freeze && now<S.freeze.until){
+    render(S.freeze.now);
+    lastNow=S.freeze.until;          // dt после разморозки не прыгнет
+    requestAnimationFrame(loop);
+    return;
+  }
+  S.freeze=null;
   const dt=clamp(now-lastNow, 0, 50);
   lastNow=now; ticks++;
   updateFx(dt);
@@ -959,11 +1166,11 @@ function runSelftest(){
     syncHp();
     return ok;
   });
-  check('ST13 тайминг: встречные равные дуги → клинч', ()=>{
+  check('ST13 тайминг: несинхронные дуги → размен (any=клинч)', ()=>{
     const A=buildTraj([P(150,330),P(750,330)]);
     const B=buildTraj([P(810,300),P(450,340),P(210,300)]);
     const anyM=resolveRound(A,B,'any'), tim=resolveRound(A,B,'timing');
-    return anyM.type==='clinch' && tim.type==='clinch';
+    return anyM.type==='clinch' && tim.type==='hits' && tim.hitA && tim.hitB;
   });
   check('ST14 тайминг: глубокий изгиб → лапы разминаются', ()=>{
     const A=buildTraj([P(150,330),P(750,330)]);
@@ -979,6 +1186,35 @@ function runSelftest(){
     const v=document.querySelector('input[name=cMode]:checked').value;
     sim.remove();
     return v==='timing';
+  });
+  check('ST16 тайминг: зеркальный крест → синхро-клинч', ()=>{
+    const A=buildTraj([P(150,300),P(750,400)]);
+    const B=buildTraj([P(810,300),P(210,400)]);   // противонаклон: лапы встречаются в (480,355) на равных долях
+    const r=resolveRound(A,B,'timing');
+    return r.type==='clinch' && r.kind==='sync' && r.winner===-1 && r.deltaMs<=SYNC_MS;
+  });
+  check('ST17 тайминг: лёгкая асимметрия → парирование', ()=>{
+    const A=buildTraj([P(150,300),P(750,400)]);
+    const B=buildTraj([P(810,300),P(390,363),P(210,400)]);   // дуга-волна: A в точке раньше на ~66 мс
+    const r=resolveRound(A,B,'timing');
+    return r.type==='clinch' && r.kind==='parry' && r.winner===0 &&
+           r.deltaMs>SYNC_MS && r.deltaMs<=PARRY_WIN;
+  });
+  check('ST18 тайминг: пари + доезд раннего до кота', ()=>{
+    const A=buildTraj([P(150,300),P(750,400)]);
+    const B=buildTraj([P(810,300),P(390,363),P(210,400)]);
+    const r=resolveRound(A,B,'timing');
+    return r.type==='clinch' && r.kind==='parry' && r.winner===0 &&
+           r.hitW===true;                                   // конец дуги победителя в зоне побеждённого
+  });
+  check('ST19 звук: синтезатор жив и молчит без AudioContext', ()=>{
+    try{
+      window.__fight.sfx.bam(); window.__fight.sfx.clank();
+      window.__fight.sfx.parry(); window.__fight.sfx.whiff();
+      const a=window.__fight.sfx.toggle();     // on→false
+      const b=window.__fight.sfx.toggle();     // off→true
+      return a===false && b===true;
+    }catch(e){ return false; }
   });
   const total=Object.keys(results).length;
   const failed=Object.entries(results).filter(([k,v])=>!v).map(([k])=>k);
@@ -996,8 +1232,8 @@ function forceRound(ptsA, ptsB){
 
 /* ═══════════════ DEBUG API ═══════════════ */
 window.__fight={
-  v:1,
-  get state(){ return {phase:S.phase, hp:S.hp.slice(), round:S.round, winner:S.winner, mode:S.mode, doubleKO:S.doubleKO}; },
+  v:2,
+  get state(){ return {phase:S.phase, hp:S.hp.slice(), round:S.round, winner:S.winner, mode:S.mode, doubleKO:S.doubleKO, clinchMode:S.clinchMode}; },
   start(m){ startMatch(m); },
   lobby(){ screenLobby(); },
   forceRound,
@@ -1014,6 +1250,7 @@ window.__fight={
     const A=buildTraj(ptsA), B=buildTraj(ptsB);
     return resolveRound(A,B,mode);
   },
+  sfx,
   get clinchMode(){ return S.clinchMode; },
   zoneInfo(i){ const c=catCenter(i); return {x:c.x, y:c.y, rx:ZONE_RX, ry:ZONE_RY}; },
   ticks(){ return ticks; },
