@@ -74,11 +74,15 @@
   .penopt:hover { color: #d7d9de; }
   .penopt input { accent-color: #f5a94b; width: 14px; height: 14px; cursor: pointer; margin: 0; }
 
-  .sliders { display: flex; align-items: center; gap: 10px; flex: 1 1 320px; min-width: 0; }
-  .sgrp { display: flex; align-items: center; gap: 7px; flex: 1 1 0; min-width: 96px; }
+  .sliders {
+    display: flex; align-items: center; gap: 10px;
+    flex: 1 1 320px; flex-wrap: wrap; row-gap: 8px; min-width: 280px;
+  }
+  .sgrp { display: flex; align-items: center; gap: 7px; flex: 1 1 118px; min-width: 118px; }
   .sgrp .lab { font-size: 9.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #8f939c; white-space: nowrap; }
-  .sgrp input[type=range] { flex: 1 1 0; min-width: 44px; accent-color: #f5a94b; }
+  .sgrp input[type=range] { flex: 1 1 44px; min-width: 44px; accent-color: #f5a94b; }
   .sgrp .val { min-width: 26px; text-align: right; color: #b8bac0; font-variant-numeric: tabular-nums; font-size: 11px; }
+  .btypes, .bdiv, #brushPrev, .penopt { flex: 0 0 auto; }
   #brushPrev {
     width: 42px; height: 42px; border-radius: 8px; flex: 0 0 auto;
     background: #17181b; border: 1px solid #3b3d44;
@@ -134,6 +138,10 @@
   .ptab:hover { background: #2c2e34; color: #f0f1f4; }
   .ptab.active { background: rgba(245,169,75,.14); border-color: #f5a94b; color: #ffd9a3; font-weight: 700; }
   .ppane { display: flex; flex-direction: column; gap: 6px; }
+  /* атрибут hidden перебивается display:flex (классика) — панель,
+     выключенная табом, обязана исчезать, иначе CatWar-палитры
+     оставались на экране при возврате на «Свой» */
+  .ppane[hidden] { display: none !important; }
   #paneCW { max-height: 176px; overflow-y: auto; padding-right: 4px; }
 
   .cwgrp { display: flex; flex-direction: column; gap: 4px; }
@@ -155,6 +163,50 @@
   .sw.active { outline: 2px solid #f5a94b; outline-offset: 1px; }
   .swempty { font-size: 10px; color: #62656e; }
 
+  /* --- слои --- */
+  .lylst { display: flex; flex-direction: column; gap: 4px; }
+  .lrow {
+    display: flex; align-items: center; gap: 6px; min-height: 30px;
+    padding: 2px 6px; border: 1px solid #3b3d44; border-radius: 7px;
+    background: #1b1c20; cursor: pointer; transition: .12s;
+  }
+  .lrow:hover { background: #23252b; }
+  .lrow.active { border-color: #f5a94b; background: rgba(245,169,75,.12); }
+  .lrow .lname { flex: 1; font-size: 11.5px; color: #d7d9de; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lrow.off .lname { color: #6c707a; text-decoration: line-through; }
+  .lye {
+    width: 26px; height: 26px; flex: 0 0 auto; border: none; background: transparent;
+    color: #b9bcc4; cursor: pointer; border-radius: 6px; display: flex;
+    align-items: center; justify-content: center; padding: 0;
+  }
+  .lye:hover { background: #2c2e34; color: #fff; }
+  .lye svg { width: 15px; height: 15px; }
+  /* мини-предпросмотр слоя: сам кот-контент на шахматке прозрачности */
+  .lyth {
+    flex: 0 0 auto; width: 42px; height: 28px; border-radius: 4px;
+    border: 1px solid #3b3d44; pointer-events: none;
+    background: repeating-conic-gradient(#26282e 0 25%, #1d1f24 0 50%) 0 0 / 8px 8px;
+  }
+  .lrow.off .lyth { opacity: .45; }
+  .loprow select.lmode {
+    flex: 1 1 0; min-width: 0; height: 26px; border-radius: 7px;
+    border: 1px solid #3b3d44; background: #1b1c20; color: #d7d9de;
+    font-size: 11.5px; padding: 0 4px; cursor: pointer;
+  }
+  .lyctl { display: flex; gap: 5px; }
+  .lybtn {
+    flex: 1; height: 30px; border-radius: 7px; border: 1px solid #3b3d44;
+    background: #1b1c20; color: #d7d9de; font-size: 13px; cursor: pointer;
+    transition: .12s; padding: 0; line-height: 1;
+  }
+  .lybtn:hover:not(:disabled) { background: #2c2e34; color: #fff; }
+  .lybtn:disabled { opacity: .28; cursor: default; }
+  .lybtn.danger:hover:not(:disabled) { background: rgba(226,85,79,.16); color: #ffb4b4; border-color: rgba(226,85,79,.4); }
+  .loprow { display: flex; align-items: center; gap: 8px; }
+  .loprow .cap { min-width: 74px; }
+  .loprow input[type=range] { flex: 1 1 0; min-width: 40px; accent-color: #f5a94b; }
+  .loprow .val { min-width: 30px; text-align: right; color: #b8bac0; font-size: 11px; font-variant-numeric: tabular-nums; }
+
   .acts { display: flex; gap: 6px; }
   .abtn {
     flex: 1; height: 32px; border-radius: 8px; border: 1px solid #3b3d44;
@@ -170,14 +222,51 @@
   }
   .gbtn:hover { filter: brightness(1.08); }
   .exp { display: flex; gap: 6px; }
+  .exp + .exp { margin-top: 6px; }
   .exp .abtn { flex: 1; }
+  #toast {
+    position: fixed; left: 50%; top: 18px; transform: translateX(-50%) translateY(-10px);
+    max-width: 440px; padding: 9px 14px; border-radius: 9px; z-index: 50;
+    background: #23252b; border: 1px solid #f5a94b; color: #ffe9c9;
+    font-size: 12.5px; line-height: 1.45; box-shadow: 0 8px 26px rgba(0,0,0,.55);
+    opacity: 0; pointer-events: none; transition: .18s;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* --- мобильная/узкая вёрстка --- */
   @media (max-width: 1040px) {
     .main { flex-direction: column; }
     .dock { flex-direction: row; flex: 0 0 auto; align-self: flex-start; }
     .dock .div { height: auto; width: 1px; margin: 3px 4px; }
     .side { flex: 1 1 auto; }
     #work { width: 100%; height: auto; }
+    /* подсказка про Ctrl+Z не нужна там, где нет клавиатуры */
+    .top .keys { display: none; }
+    .brand + .tagline { font-size: 10px; }
+  }
+  @media (max-width: 620px) {
+    body { padding: 8px 8px 12px; }
+    .top { gap: 8px; }
+    .tagline { font-size: 9.5px; }
+    .brushbar { padding: 7px 8px; gap: 8px; }
+    .bbtn { width: 47px; height: 44px; }
+    .tbtn, .dbtn { width: 43px; height: 43px; }
+    .ptab { height: 32px; font-size: 12px; }
+    .abtn, .gbtn { height: 38px; font-size: 12.5px; }
+    .lybtn { height: 36px; }
+    .lye { width: 30px; height: 30px; }
+    .lrow { min-height: 36px; }
+    input[type=range] { min-height: 26px; }
+  }
+  /* тач: без серых вспышек тапа и pull-to-refresh посреди рисования */
+  button, .lrow, .ptab { -webkit-tap-highlight-color: transparent; }
+  body { overscroll-behavior-y: contain; }
+  /* тач-цели: двойной тап по кнопке не зумит страницу, лонг-пресс по канве
+     не зовёт контекстное меню iOS и не выделяет «текст» */
+  button, .ptab, .lrow, .lrow .lye, .histRow, .cwitem, .abtn, .gbtn,
+  .lybtn, .dbtn, .tbtn, .bbtn { touch-action: manipulation; }
+  body, .app, #work, #svSquare, #hueBar {
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
   }
 
   #selftest {
@@ -295,18 +384,45 @@
       </div>
 
       <div class="section">
+        <div class="cap">Слои</div>
+        <div class="lylst" id="layerList"></div>
+        <div class="lyctl">
+          <button type="button" class="lybtn" id="lyAdd" title="Новый слой сверху">+</button>
+          <button type="button" class="lybtn" id="lyUp" title="Поднять активный слой">↑</button>
+          <button type="button" class="lybtn" id="lyDown" title="Опустить активный слой">↓</button>
+          <button type="button" class="lybtn" id="lyMerge" title="Слить активный слой с нижним">⇩ слить</button>
+          <button type="button" class="lybtn danger" id="lyDel" title="Удалить активный слой">× слой</button>
+        </div>
+        <div class="loprow">
+          <span class="cap">сила слоя</span>
+          <input type="range" id="layerOp" min="0" max="100" step="5" value="100" title="Непрозрачность активного слоя">
+          <span class="val" id="layerOpVal">100%</span>
+        </div>
+        <div class="loprow">
+          <span class="cap">наложение</span>
+          <select class="lmode" id="layerMode" title="Как активный слой ложится на то, что под ним (как в Krita)"></select>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="cap">Кот</div>
         <div class="acts">
           <button type="button" class="abtn danger" id="btnClear" title="Убрать всю краску, кот как был">стереть всё</button>
         </div>
         <div class="exp">
-          <button type="button" class="abtn" id="btnExpPaint" title="Только слой окраса, фон прозрачный">слой окраса</button>
+          <button type="button" class="abtn" id="btnImpOpen" title="Открыть файл слоя краски из KNS Paint (PNG 300×200): краска встанет в АКТИВНЫЙ слой, отмена вернёт прежнюю">открыть проект</button>
+          <button type="button" class="abtn" id="btnExpPaint" title="Краска всех видимых слоёв, фон прозрачный">слой окраса</button>
+        </div>
+        <div class="exp">
+          <button type="button" class="gbtn" id="btnExpGame" title="Спрайт для игры: кот с окрасом, обрезка по силуэту, лапы у нижней кромки">скачать для игры</button>
           <button type="button" class="gbtn" id="btnExpWork" title="PNG с котом и окрасом">скачать кота</button>
         </div>
+        <input type="file" id="fileImport" accept="image/png" hidden>
       </div>
     </aside>
   </div>
 
+  <div id="toast"></div>
   <pre id="selftest"></pre>
 </div>
 
@@ -315,7 +431,7 @@
 (function () {
 'use strict';
 /* ============================================================
-   KNS Paint v6 — кисть по коту с контрактом:
+   KNS Paint v8 — кисть по коту с контрактом:
    1) краска не выходит за силуэт кота И не плотнее скетча
       на АА-кромке (cap по альфе — нет артефактов у ушей/спины);
    2) контур кота (тёмные линии скетча) всегда ПОВЕРХ краски;
@@ -324,7 +440,23 @@
    4) ластик стирает краску до базы, кот и контур не трогаются;
    5) seed штампов зависит только от позиции на пути — карандаш
       и спрей не «дёргаются» при движении курсора;
-   6) цвет: таб «Свой» (HSV) и «CatWar» (палитры окрасов CatWar).
+   6) цвет: таб «Свой» (HSV) и «CatWar» (палитры окрасов CatWar);
+   7) импорт проекта: PNG «слой краски» 300×200 — REPLACE краски
+      АКТИВНОГО слоя, один undo-шаг на весь импорт, клип по
+      силуэту и кап по альфе скетча; «картинка кота» распознаётся
+      и отклоняется с тостом;
+   8) экспорт «для игры»: композит, кроп по bbox силуэта скетча,
+      паддинг 2px слева/сверху/справа, снизу 0 — опора лап у кромки;
+   9) СЛОИ: стек краски — новый/удалить/переставить/слить с нижним/
+      сила слоя/глаз видимости/РЕЖИМ НАЛОЖЕНИЯ (16 режимов: обычный/
+      умножение/экран/перекрытие/…); рисование в активный; undo хранит
+      пиксельные шаги (по слою) и структурные (живые canvas-ссылки);
+      persist v2 пишет все слои (с режимом); «слой окраса» = сплющенные
+      видимые; в списке слоёв — ЖИВОЙ МИНИ-ПРЕДПРОСМОТР каждого слоя;
+  10) мобильные: тач-рисование (pointer events + touch-action), цели
+      нажатия крупнее, вёрстка колонкой до узких экранов;
+  11) хоткеи по ФИЗИЧЕСКОМУ коду клавиши — ру-раскладка (z→я)
+      не отключает Ctrl+Z; табы палитр честно прячут панель.
    ============================================================ */
 
 var D = window.PAINT_DATA || (typeof PAINT_DATA !== 'undefined' ? PAINT_DATA : null);
@@ -383,9 +515,29 @@ var history = [];
 var HIST_MAX = 18;
 
 /* ---------- канвасы ---------- */
-var baseCv = mkCv(), paintCv = mkCv(), liveCv = mkCv(), lineCv = mkCv(), tmpCv = mkCv();
-var bctx = ctx2d(baseCv), pctx = ctx2d(paintCv), lctx = ctx2d(liveCv), linectx = ctx2d(lineCv), tctx = ctx2d(tmpCv);
+var baseCv = mkCv(), liveCv = mkCv(), lineCv = mkCv(), tmpCv = mkCv();
+var bctx = ctx2d(baseCv), lctx = ctx2d(liveCv), linectx = ctx2d(lineCv), tctx = ctx2d(tmpCv);
 var work = $('work'), wctx = ctx2d(work);
+
+/* ---------- СЛОИ (порядок снизу вверх) ----------
+   Каждый слой — свой канвас W×H. Инструменты рисуют в АКТИВНЫЙ слой:
+   paintCv/pctx — алиасы его канваса/контекста, смена слоя меняет алиасы,
+   пиксели не копируются. Композит идёт по массиву layers с силой слоя. */
+var layers = [], activeLy = 0, layerSeq = 0;
+function mkLayer() {
+  var cv = mkCv();
+  layerSeq++;
+  return {
+    id: layerSeq, name: 'Слой ' + layerSeq, visible: true, opacity: 1,
+    mode: 'source-over', cv: cv, ctx: ctx2d(cv)
+  };
+}
+layers.push(mkLayer());
+var paintCv = layers[0].cv, pctx = layers[0].ctx;
+function syncActiveAlias() {
+  paintCv = layers[activeLy].cv;
+  pctx = layers[activeLy].ctx;
+}
 
 /* ---------- ассеты ---------- */
 var assets = { base: new Image() };
@@ -414,70 +566,107 @@ function buildBase() {
   linectx.putImageData(li, 0, 0);
 }
 
-/* ---------- композит: скетч → краска (клипнута) → контур поверх ---------- */
+/* ---------- композит: скетч → слои краски (сила/видимость) → контур поверх ---------- */
 function paintLayer() {
-  if (liveStroke && liveStroke.erase) {
-    /* живой ластик: краска минус маска стирации */
-    tctx.globalCompositeOperation = 'source-over';
-    tctx.clearRect(0, 0, W, H);
-    tctx.drawImage(paintCv, 0, 0);
-    tctx.globalCompositeOperation = 'destination-out';
-    tctx.globalAlpha = liveStroke.alpha;
-    tctx.drawImage(liveCv, 0, 0);
-    tctx.globalAlpha = 1;
-    tctx.globalCompositeOperation = 'source-over';
-    return tmpCv;
-  }
-  return paintCv;
+  /* живой ластик: краска АКТИВНОГО слоя минус маска стирания */
+  tctx.globalCompositeOperation = 'source-over';
+  tctx.clearRect(0, 0, W, H);
+  tctx.drawImage(paintCv, 0, 0);
+  tctx.globalCompositeOperation = 'destination-out';
+  tctx.globalAlpha = liveStroke.alpha;
+  tctx.drawImage(liveCv, 0, 0);
+  tctx.globalAlpha = 1;
+  tctx.globalCompositeOperation = 'source-over';
+  return tmpCv;
 }
 function composite() {
   wctx.clearRect(0, 0, W, H);
   wctx.drawImage(baseCv, 0, 0);
-  var pl = paintLayer();
-  if (pl !== paintCv) {
-    wctx.drawImage(pl, 0, 0);
-  } else {
-    wctx.drawImage(paintCv, 0, 0);
-    if (liveStroke) {
-      wctx.globalAlpha = liveStroke.alpha;
-      wctx.drawImage(liveCv, 0, 0);
-      wctx.globalAlpha = 1;
+  for (var i = 0; i < layers.length; i++) {
+    var L = layers[i];
+    if (!L.visible) continue;
+    wctx.globalAlpha = L.opacity;
+    /* режим наложения слоя (normal/multiply/screen/overlay/...). Покрытую
+       краской часть кота слой «смешивает» с тем, что под ним (базовый скетч
+       или нижние слои); свои прозрачные px не влияют — Porter-Duff;
+       живой мазок/ластик идут с тем же режимом, как предпросмотр в Krita */
+    wctx.globalCompositeOperation = L.mode || 'source-over';
+    if (i === activeLy && liveStroke && liveStroke.erase) {
+      wctx.drawImage(paintLayer(), 0, 0);
+    } else {
+      wctx.drawImage(L.cv, 0, 0);
+      if (i === activeLy && liveStroke) {
+        /* живой мазок активного слоя — с силой этого слоя */
+        wctx.globalAlpha = L.opacity * liveStroke.alpha;
+        wctx.drawImage(liveCv, 0, 0);
+      }
     }
+    wctx.globalAlpha = 1;
+    wctx.globalCompositeOperation = 'source-over';
   }
   wctx.drawImage(lineCv, 0, 0);   /* контур всегда поверх */
 }
 
-/* ---------- undo/redo ---------- */
+/* ---------- undo/redo ----------
+   Два вида шагов: 'px' — пиксели одного слоя (мазок/заливка/импорт),
+   'st' — структура слоёв (добавить/удалить/порядок/сила/видимость/стереть
+   всё): канвасы в снапшоте — живые ссылки, пиксели не копируются. */
 var undoStack = [], redoStack = [], MAX_UNDO = 120;
 function paintSnapshot() { return pctx.getImageData(0, 0, W, H); }
+function layerMeta() {
+  return layers.map(function (L) {
+    return { id: L.id, name: L.name, visible: L.visible, opacity: L.opacity, mode: L.mode, cv: L.cv };
+  });
+}
+function structSnap() { return { t: 'st', layers: layerMeta(), active: activeLy }; }
+function applyStruct(e) {
+  layers = e.layers.map(function (m) {
+    return {
+      id: m.id, name: m.name, visible: m.visible, opacity: m.opacity,
+      mode: (m.mode && isLayerMode(m.mode)) ? m.mode : 'source-over',
+      cv: m.cv, ctx: ctx2d(m.cv)
+    };
+  });
+  activeLy = Math.max(0, Math.min(layers.length - 1, e.active));
+  syncActiveAlias(); renderLayers();
+}
+function snapPx(cv) { return cv.getContext('2d').getImageData(0, 0, W, H); }
 function pushUndo() {
-  undoStack.push(paintSnapshot());
+  undoStack.push({ t: 'px', cv: paintCv, img: pctx.getImageData(0, 0, W, H) });
   if (undoStack.length > MAX_UNDO) undoStack.shift();
   redoStack.length = 0;
   updateUndoUI();
 }
-function doUndo() {
-  if (!undoStack.length) return false;
-  redoStack.push(paintSnapshot());
-  pctx.putImageData(undoStack.pop(), 0, 0);
+function pushStructUndo() {
+  undoStack.push(structSnap());
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack.length = 0;
+  updateUndoUI();
+}
+function undoRedoDo(popStack, pushStack) {
+  if (!popStack.length) return false;
+  var e = popStack.pop();
+  if (e.t === 'px') {
+    pushStack.push({ t: 'px', cv: e.cv, img: snapPx(e.cv) });
+    e.cv.getContext('2d').putImageData(e.img, 0, 0);
+    renderLayers();          /* мини-кадры: пиксели вернулись — обновить */
+  } else {
+    pushStack.push(structSnap());
+    applyStruct(e);
+  }
   composite(); schedulePersist(); updateUndoUI();
   return true;
 }
-function doRedo() {
-  if (!redoStack.length) return false;
-  undoStack.push(paintSnapshot());
-  pctx.putImageData(redoStack.pop(), 0, 0);
-  composite(); schedulePersist(); updateUndoUI();
-  return true;
-}
+function doUndo() { return undoRedoDo(undoStack, redoStack); }
+function doRedo() { return undoRedoDo(redoStack, undoStack); }
 function updateUndoUI() {
   $('btnUndo').disabled = undoStack.length === 0;
   $('btnRedo').disabled = redoStack.length === 0;
 }
 function clearPaint() {
-  pushUndo();
-  pctx.clearRect(0, 0, W, H);
-  composite(); schedulePersist();
+  pushStructUndo();
+  for (var i = 0; i < layers.length; i++) layers[i].ctx.clearRect(0, 0, W, H);
+  composite(); schedulePersist(); renderLayers();
 }
 
 /* ---------- штампы: px-перечисление с MAX-альфой ---------- */
@@ -689,7 +878,7 @@ function liveEnd() {
   pctx.globalCompositeOperation = 'source-over';
   lctx.clearRect(0, 0, W, H);
   liveStroke = null;
-  composite(); schedulePersist();
+  composite(); schedulePersist(); renderLayers();
 }
 /* программный мазок для тестов/зондов: путь (x0,y0)->(x1,y1) */
 function strokeLine(x0, y0, x1, y1, uo) {
@@ -764,7 +953,7 @@ function floodFillAt(ax, ay, uo) {
   pctx.globalAlpha = alpha;
   pctx.drawImage(fillCv, 0, 0);
   pctx.globalAlpha = 1;
-  composite(); schedulePersist();
+  composite(); schedulePersist(); renderLayers();
   return region.length;
 }
 
@@ -777,7 +966,201 @@ function pickAt(ax, ay) {
   return true;
 }
 
-/* ---------- persist ---------- */
+/* ---------- СЛОИ: управление и панель ---------- */
+var EYE_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>';
+var EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a17.9 17.9 0 0 1-3.2 3.9"/><path d="M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 6.5 10 6.5c1.4 0 2.7-.3 3.8-.7"/></svg>';
+function renderLayers() {
+  var host = $('layerList');
+  if (!host) return;
+  host.innerHTML = '';
+  /* верхний слой — первый в списке (как в Krita) */
+  for (var i = layers.length - 1; i >= 0; i--) {
+    (function (i) {
+      var L = layers[i];
+      var row = document.createElement('div');
+      row.className = 'lrow' + (i === activeLy ? ' active' : '') + (L.visible ? '' : ' off');
+      row.title = 'Сделать активным';
+      var eye = document.createElement('button');
+      eye.type = 'button';
+      eye.className = 'lye';
+      eye.title = L.visible ? 'Скрыть слой' : 'Показать слой';
+      eye.innerHTML = L.visible ? EYE_ON : EYE_OFF;
+      eye.onclick = function (ev) {
+        ev.stopPropagation();
+        pushStructUndo();
+        setLayerVisible(i, !L.visible);
+      };
+      var nm = document.createElement('span');
+      nm.className = 'lname';
+      nm.textContent = L.name + (L.opacity < 1 ? ' · ' + Math.round(L.opacity * 100) + '%' : '');
+      /* мини-предпросмотр: содержимое слоя (масштаб 42×28) на шахматке
+         прозрачности — видно и что нарисовано, и что слой пуст */
+      var th = document.createElement('canvas');
+      th.width = 42; th.height = 28; th.className = 'lyth';
+      th.title = 'Предпросмотр слоя';
+      th.getContext('2d').drawImage(L.cv, 0, 0, 42, 28);
+      row.appendChild(eye);
+      row.appendChild(th);
+      row.appendChild(nm);
+      row.onclick = function () { activateLayer(i); };
+      host.appendChild(row);
+    })(i);
+  }
+  var pct = Math.round(layers[activeLy].opacity * 100);
+  $('layerOp').value = pct;
+  $('layerOpVal').textContent = pct + '%';
+  $('lyUp').disabled = activeLy >= layers.length - 1;
+  $('lyDown').disabled = activeLy <= 0;
+  $('lyMerge').disabled = activeLy <= 0;
+  $('lyDel').disabled = layers.length <= 1;
+  syncModeSelect();
+}
+function activateLayer(i) {
+  if (i < 0 || i >= layers.length) return;
+  if (liveStroke) liveEnd();
+  if (i === activeLy) { renderLayers(); return; }
+  activeLy = i;
+  syncActiveAlias(); renderLayers(); composite(); schedulePersist();
+}
+function addLayerUI() {
+  if (liveStroke) liveEnd();
+  pushStructUndo();
+  layers.push(mkLayer());
+  activeLy = layers.length - 1;
+  syncActiveAlias(); renderLayers(); composite(); schedulePersist();
+  toast(layers[activeLy].name + ' добавлен — рисуй сверху');
+}
+function delLayerUI() {
+  if (layers.length <= 1) { toast('последний слой удалить нельзя'); return; }
+  if (liveStroke) liveEnd();
+  pushStructUndo();
+  layers.splice(activeLy, 1);
+  activeLy = Math.max(0, activeLy - 1);
+  syncActiveAlias(); renderLayers(); composite(); schedulePersist();
+}
+function moveLayerUI(dir) {
+  var j = activeLy + dir;
+  if (j < 0 || j >= layers.length) return;
+  if (liveStroke) liveEnd();
+  pushStructUndo();
+  var t = layers[activeLy];
+  layers[activeLy] = layers[j];
+  layers[j] = t;
+  activeLy = j;
+  syncActiveAlias(); renderLayers(); composite(); schedulePersist();
+}
+function mergeDownUI() {
+  if (activeLy <= 0) return;
+  if (liveStroke) liveEnd();
+  pushStructUndo();
+  var topL = layers[activeLy], lowL = layers[activeLy - 1];
+  /* слить с тем же режимом наложения, каким верхний слой показывался:
+     результат слияния выглядит как раньше — эффект не теряется */
+  lowL.ctx.globalAlpha = topL.opacity;
+  lowL.ctx.globalCompositeOperation = topL.mode || 'source-over';
+  lowL.ctx.drawImage(topL.cv, 0, 0);
+  lowL.ctx.globalAlpha = 1;
+  lowL.ctx.globalCompositeOperation = 'source-over';
+  layers.splice(activeLy, 1);
+  activeLy -= 1;
+  if (lowL.visible === false && topL.visible === true) lowL.visible = true;
+  syncActiveAlias(); renderLayers(); composite(); schedulePersist();
+}
+/* программные регуляторы (без undo-шага — для самотеста и зондов) */
+function setLayerVisible(i, v) {
+  if (i < 0 || i >= layers.length) return;
+  layers[i].visible = !!v;
+  renderLayers(); composite(); schedulePersist();
+}
+function setLayerOpacity(i, pct) {
+  if (i < 0 || i >= layers.length) return;
+  layers[i].opacity = Math.max(0, Math.min(1, pct / 100));
+  renderLayers(); composite(); schedulePersist();
+}
+/* слайдер силы слоя: undo-шаг один на весь писк (снимок до дёрганья) */
+var opUndoPending = null;
+$('layerOp').addEventListener('pointerdown', function () { opUndoPending = structSnap(); });
+$('layerOp').addEventListener('input', function () {
+  var pct = parseInt(this.value, 10);
+  layers[activeLy].opacity = pct / 100;
+  $('layerOpVal').textContent = pct + '%';
+  composite();
+});
+$('layerOp').addEventListener('change', function () {
+  renderLayers(); schedulePersist();
+  if (opUndoPending) {
+    if (undoStack.length >= MAX_UNDO) undoStack.shift();
+    undoStack.push(opUndoPending);
+    redoStack.length = 0;
+    updateUndoUI();
+    opUndoPending = null;
+  }
+});
+/* ---------- режимы наложения слоя (Krita/PS-style blend) ---------- */
+var LAYER_MODES = [
+  ['source-over', 'Обычный'],
+  ['multiply', 'Умножение'],
+  ['screen', 'Экран'],
+  ['overlay', 'Перекрытие'],
+  ['darken', 'Замена тёмным'],
+  ['lighten', 'Замена светлым'],
+  ['color-dodge', 'Осветление основы'],
+  ['color-burn', 'Затемнение основы'],
+  ['soft-light', 'Мягкий свет'],
+  ['hard-light', 'Жёсткий свет'],
+  ['difference', 'Разница'],
+  ['exclusion', 'Исключение'],
+  ['hue', 'Тон'],
+  ['saturation', 'Насыщенность'],
+  ['color', 'Цветность'],
+  ['luminosity', 'Яркость']
+];
+function isLayerMode(m) {
+  for (var q = 0; q < LAYER_MODES.length; q++) if (LAYER_MODES[q][0] === m) return true;
+  return false;
+}
+var modeOptionsBuilt = false;
+function syncModeSelect() {
+  var s = $('layerMode');
+  if (!s) return;
+  if (!modeOptionsBuilt) {
+    modeOptionsBuilt = true;
+    s.innerHTML = '';
+    LAYER_MODES.forEach(function (mm) {
+      var o = document.createElement('option');
+      o.value = mm[0]; o.textContent = mm[1];
+      s.appendChild(o);
+    });
+  }
+  s.value = layers[activeLy].mode || 'source-over';
+}
+/* программная смена режима (зонды/самотест) */
+function setLayerMode(i, m) {
+  if (i < 0 || i >= layers.length) return;
+  if (!isLayerMode(m)) return;
+  layers[i].mode = m;
+  renderLayers(); composite(); schedulePersist();
+}
+/* смена режима активного слоя селектом — один undo-шаг на выбор */
+function setLayerModeUI(m) {
+  if (liveStroke) liveEnd();
+  pushStructUndo();
+  setLayerMode(activeLy, m);
+  toast('наложение: ' + modeLabel(m));
+}
+function modeLabel(m) {
+  for (var q = 0; q < LAYER_MODES.length; q++) if (LAYER_MODES[q][0] === m) return LAYER_MODES[q][1];
+  return 'Обычный';
+}
+$('layerMode').onchange = function () { setLayerModeUI(this.value); };
+
+$('lyAdd').onclick = addLayerUI;
+$('lyDel').onclick = delLayerUI;
+$('lyUp').onclick = function () { moveLayerUI(1); };
+$('lyDown').onclick = function () { moveLayerUI(-1); };
+$('lyMerge').onclick = mergeDownUI;
+
+/* ---------- persist (v2: все слои + настройки) ---------- */
 var persistTimer = null;
 function schedulePersist() {
   if (persistTimer) return;
@@ -785,13 +1168,36 @@ function schedulePersist() {
 }
 function persistNow() {
   try {
+    var arr = layers.map(function (L) {
+      return {
+        n: L.name, v: L.visible ? 1 : 0, o: Math.round(L.opacity * 100) / 100,
+        m: L.mode || 'source-over', d: L.cv.toDataURL('image/png')
+      };
+    });
     localStorage.setItem(KEY, JSON.stringify({
-      p: paintCv.toDataURL('image/png'),
+      v: 2, active: activeLy, layers: arr,
       color: state.color, size: state.size, opacity: state.opacity,
       brush: state.brush, hardness: state.hardness, penPress: state.penPress,
       history: history.slice(0, HIST_MAX)
     }));
   } catch (e) { }
+}
+/* восстановление слоя из dataURL с клипом по силуэту (чужая/старая
+   краска не выходит за кота), done() — когда слой готов */
+function restoreLayerFrom(L, url, done) {
+  var img = new Image();
+  img.onload = function () {
+    var t = mkCv(), tctx = ctx2d(t);
+    tctx.drawImage(img, 0, 0);
+    tctx.globalCompositeOperation = 'destination-in';
+    tctx.drawImage(baseCv, 0, 0);
+    tctx.globalCompositeOperation = 'source-over';
+    L.ctx.clearRect(0, 0, W, H);
+    L.ctx.drawImage(t, 0, 0);
+    done();
+  };
+  img.onerror = function () { done(); };
+  img.src = url;
 }
 function tryRestore() {
   try {
@@ -822,21 +1228,30 @@ function tryRestore() {
       });
       renderHistory();
     }
-    if (o && typeof o.p === 'string' && o.p.indexOf('data:image') === 0) {
-      var img = new Image();
-      img.onload = function () {
-        /* старая/чужая краска клипнется по силуэту кота при загрузке */
-        var t = mkCv(), tctx = ctx2d(t);
-        tctx.drawImage(img, 0, 0);
-        tctx.globalCompositeOperation = 'destination-in';
-        tctx.drawImage(baseCv, 0, 0);
-        tctx.globalCompositeOperation = 'source-over';
-        pctx.clearRect(0, 0, W, H);
-        pctx.drawImage(t, 0, 0);
-        composite();
-      };
-      img.onerror = function () { };
-      img.src = o.p;
+    if (o && Object.prototype.toString.call(o.layers) === '[object Array]' && o.layers.length) {
+      /* формат v2: слои */
+      layers = [];
+      for (var li = 0; li < o.layers.length; li++) {
+        var m = o.layers[li];
+        var L = mkLayer();
+        L.name = (m && typeof m.n === 'string' && m.n) || L.name;
+        L.visible = !(m && m.v === 0);
+        if (m && typeof m.o === 'number') L.opacity = Math.max(0, Math.min(1, m.o));
+        if (m && typeof m.m === 'string' && isLayerMode(m.m)) L.mode = m.m;
+        layers.push(L);
+      }
+      activeLy = (typeof o.active === 'number') ? Math.max(0, Math.min(layers.length - 1, o.active)) : layers.length - 1;
+      syncActiveAlias(); renderLayers();
+      var left = layers.length;
+      layers.forEach(function (L, i2) {
+        var url = (o.layers[i2] && typeof o.layers[i2].d === 'string') ? o.layers[i2].d : '';
+        if (!url || url.indexOf('data:image') !== 0) { left--; return; }
+        restoreLayerFrom(L, url, function () { left--; if (left === 0) composite(); });
+      });
+      composite();   /* сразу пустые; восстановленный слой дорисуется onload */
+    } else if (o && typeof o.p === 'string' && o.p.indexOf('data:image') === 0) {
+      /* старый формат (одна краска) — становится слоем №1 */
+      restoreLayerFrom(layers[0], o.p, composite);
     }
   } catch (e) { }
 }
@@ -1199,18 +1614,25 @@ $('hexIn').addEventListener('input', function () { setColor(this.value); });
 $('hexIn').addEventListener('blur', function () { this.value = state.color; });
 $('prevColor').addEventListener('click', function () { setColor(state.prevColor); });
 
+/* ---------- хоткеи: по ФИЗИЧЕСКОЙ клавише (e.code) ----------
+   На русской раскладке e.key для Z — «я», для Y — «н»: матчинг по e.key
+   молча убивал Ctrl+Z/Ctrl+Y/Ctrl+B. ev.code не зависит от раскладки. */
 window.addEventListener('keydown', function (e) {
   var tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   var mod = e.ctrlKey || e.metaKey;
-  var k = (e.key || '').toLowerCase();
-  if (mod && k === 'z') { if (e.shiftKey) doRedo(); else doUndo(); }
-  else if (mod && k === 'y') { doRedo(); }
-  else if (!mod && k === '1') setTool('brush');
-  else if (!mod && k === '2') setTool('eraser');
-  else if (!mod && k === '3') setTool('fill');
-  else if (!mod && k === '4') setTool('picker');
-  else if (!mod && k === 'b') {
+  var c = e.code || '';
+  var numMatch = { Digit1: 'brush', Numpad1: 'brush', Digit2: 'eraser', Numpad2: 'eraser',
+                   Digit3: 'fill', Numpad3: 'fill', Digit4: 'picker', Numpad4: 'picker' };
+  if (mod && c === 'KeyZ') {
+    e.preventDefault();
+    if (e.shiftKey) doRedo(); else doUndo();
+  } else if (mod && c === 'KeyY') {
+    e.preventDefault();
+    doRedo();
+  } else if (!mod && numMatch[c]) {
+    setTool(numMatch[c]);
+  } else if (!mod && (c === 'KeyB')) {
     var cyc = ['round', 'flat', 'pencil', 'spray'];
     var cur = cyc.indexOf(state.brush);
     setBrush(cyc[(cur + 1) % cyc.length]);
@@ -1226,8 +1648,159 @@ function download(canvas, name) {
   a.click();
   document.body.removeChild(a);
 }
+/* «слой окраса» = сплющенные ВИДИМЫЕ слои краски (RGB=цвет, A=плотность,
+   фон прозрачный) — формат файла не изменился с v8-контрактом */
+function exportFlatCanvas() {
+  var cv = mkCv(), c = cv.getContext('2d');
+  for (var i = 0; i < layers.length; i++) {
+    var L = layers[i];
+    if (!L.visible) continue;
+    c.globalAlpha = L.opacity;
+    c.globalCompositeOperation = L.mode || 'source-over';
+    c.drawImage(L.cv, 0, 0);
+  }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+  return cv;
+}
 $('btnExpWork').onclick = function () { download(work, 'kns-paint.png'); };
-$('btnExpPaint').onclick = function () { download(paintCv, 'kns-paint-layer.png'); };
+$('btnExpPaint').onclick = function () { download(exportFlatCanvas(), 'kns-paint-layer.png'); };
+
+/* ---------- v8: тост ---------- */
+var toastTimer = null, lastToastMsg = '';
+function toast(msg) {
+  lastToastMsg = String(msg);
+  var t = $('toast');
+  if (!t) return;
+  t.textContent = lastToastMsg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('show'); toastTimer = null; }, 4200);
+}
+
+/* ---------- v8: импорт проекта (PNG «слой краски» 300×200) ---------- */
+var IMPORT_MAX_BYTES = 4 * 1024 * 1024;
+var NEED_MSG = 'нужен файл слоя краски из KNS Paint (300×200)';
+function dataUrlB64(url) {
+  var m = /^data:[^,]*;base64,(.*)$/.exec(String(url || ''));
+  return m ? m[1] : null;
+}
+/* PNG-магия 89 50 4E 47 0D 0A 1A 0A по содержимому, не по mime-префиксу */
+function pngMagicOk(b64) {
+  var head;
+  try { head = atob(b64.slice(0, 12)); } catch (e) { return false; }
+  if (head.length < 8) return false;
+  return head.charCodeAt(0) === 0x89 && head.charCodeAt(1) === 0x50 &&
+    head.charCodeAt(2) === 0x4E && head.charCodeAt(3) === 0x47 &&
+    head.charCodeAt(4) === 0x0D && head.charCodeAt(5) === 0x0A &&
+    head.charCodeAt(6) === 0x1A && head.charCodeAt(7) === 0x0A;
+}
+/* детект «картинки кота» (экспорт work): у композита непрокрашенные
+   пиксели твёрдого тела непрозрачны И равны базе; у слоя краски таких
+   нет — непрокрашенное прозрачно. Калибровка на живой паре экспортов:
+   слой 0 совпадений, композит 3632+ при заливке тела; порог 1200. */
+var COMPOSITE_MIN_MATCH = 1200;
+function compositeMatchCount(d) {
+  var bd = baseImageData.data, n = W * H, match = 0, opaque = 0;
+  for (var i = 0; i < n; i++) {
+    if (alphaCap[i] < 250) continue;
+    var o = i * 4;
+    if (d[o + 3] < 250) continue;
+    opaque++;
+    if (Math.abs(d[o] - bd[o]) <= 6 && Math.abs(d[o + 1] - bd[o + 1]) <= 6 &&
+      Math.abs(d[o + 2] - bd[o + 2]) <= 6) match++;
+  }
+  return { match: match, opaque: opaque };
+}
+/* REPLACE слоя краски, ОДИН undo-снапшот на весь импорт, клип по
+   силуэту + кап по альфе скетча, штатный persist. Promise {ok, reason} */
+function importLayer(dataURL) {
+  return new Promise(function (resolve) {
+    var bad = function (reason, msg) { toast(msg); resolve({ ok: false, reason: reason, msg: msg }); };
+    var b64 = dataUrlB64(dataURL);
+    if (!b64 || !pngMagicOk(b64)) { bad('magic', 'не PNG — ' + NEED_MSG); return; }
+    if (b64.length * 3 / 4 > IMPORT_MAX_BYTES) { bad('big', 'файл больше 4 МБ — ' + NEED_MSG); return; }
+    var img = new Image();
+    img.onload = function () {
+      if (img.naturalWidth !== W || img.naturalHeight !== H) { bad('dim', NEED_MSG); return; }
+      var t = mkCv(), tc = ctx2d(t);
+      tc.drawImage(img, 0, 0);
+      var d = tc.getImageData(0, 0, W, H).data;
+      var mc = compositeMatchCount(d);
+      if (mc.match >= COMPOSITE_MIN_MATCH) {
+        var cmsg = 'это картинка кота — для редактирования открой файл “слой краски”';
+        toast(cmsg);
+        resolve({ ok: false, reason: 'composite', msg: cmsg, match: mc.match });
+        return;
+      }
+      pushUndo();
+      var out = pctx.createImageData(W, H), od = out.data;
+      for (var i = 0; i < W * H; i++) {
+        var o = i * 4, a = d[o + 3];
+        if (!alphaCap[i]) continue;          /* клип по силуэту кота */
+        if (a > alphaCap[i]) a = alphaCap[i]; /* кап по альфе скетча */
+        od[o] = d[o]; od[o + 1] = d[o + 1]; od[o + 2] = d[o + 2]; od[o + 3] = a;
+      }
+      pctx.clearRect(0, 0, W, H);
+      pctx.putImageData(out, 0, 0);
+      composite(); schedulePersist(); renderLayers();
+      resolve({ ok: true, imported: true });
+    };
+    img.onerror = function () { bad('decode', 'файл не читается — ' + NEED_MSG); };
+    img.src = dataURL;
+  });
+}
+$('btnImpOpen').onclick = function () { $('fileImport').click(); };
+$('fileImport').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  this.value = '';                      /* повторный выбор того же файла */
+  if (!f) return;
+  if (f.size > IMPORT_MAX_BYTES) { toast('файл больше 4 МБ — ' + NEED_MSG); return; }
+  var fr = new FileReader();
+  fr.onload = function () { importLayer(fr.result); };
+  fr.onerror = function () { toast('файл не читается — ' + NEED_MSG); };
+  fr.readAsDataURL(f);
+});
+
+/* ---------- v8: экспорт «для игры» (спрайт coop-field) ---------- */
+var GAME_PAD = 2;
+function silhouetteBBox() {
+  var bd = baseImageData.data;
+  var x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (var y = 0; y < H; y++) {
+    for (var x = 0; x < W; x++) {
+      if (bd[(y * W + x) * 4 + 3] > 0) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+  }
+  return x1 < 0 ? null : { x0: x0, y0: y0, x1: x1, y1: y1 };
+}
+/* композит → кроп по bbox силуэта скетча (замер из данных, не хардкод):
+   паддинг 2px слева/сверху/справа, снизу 0 — опора лап у нижней кромки */
+function exportGameCanvas() {
+  composite();
+  var b = silhouetteBBox();
+  if (!b) return null;
+  var x0 = Math.max(0, b.x0 - GAME_PAD), y0 = Math.max(0, b.y0 - GAME_PAD);
+  var x1 = Math.min(W, b.x1 + 1 + GAME_PAD), y1 = Math.min(H, b.y1 + 1);
+  var cw = x1 - x0, chh = y1 - y0;
+  var cv = document.createElement('canvas');
+  cv.width = cw; cv.height = chh;
+  var cc = cv.getContext('2d');
+  cc.drawImage(work, x0, y0, cw, chh, 0, 0, cw, chh);
+  return cv;
+}
+function exportGameDataURL() {
+  var cv = exportGameCanvas();
+  return cv ? cv.toDataURL('image/png') : null;
+}
+$('btnExpGame').onclick = function () {
+  var cv = exportGameCanvas();
+  if (cv) download(cv, 'kns-paint-sprite.png');
+  else toast('нечего экспортировать — скетч не читается');
+};
 
 /* ============================================================
    SELFTEST (?selftest=1)
@@ -1262,6 +1835,10 @@ function lightBodyPoint() {
   return { x: ox, y: oy };
 }
 function runSelfTest() {
+  /* async — ST15 ждёт декодирования импортируемых PNG */
+  return runSelfTestAsync().then(function (r) { return r; });
+}
+async function runSelfTestAsync() {
   var lines = [], pass = 0, total = 0;
   function rec(name, ok, detail) {
     total++;
@@ -1370,7 +1947,7 @@ function runSelfTest() {
   var coreOk = phard.data[ci + 3] > 240 && psoft.data[ci + 3] > 200;
   var edgeOk = softEdge < hardEdge - 40;
   rec('ST7', edgeOk && coreOk,
-    'жёсткость: край мягкой ' + softEdge + ' < резкой ' + hardEdge + ' (euillez -40), ядро G/B ' + phard.data[ci + 3] + '/' + psoft.data[ci + 3]);
+    'жёсткость: край мягкой ' + softEdge + ' < резкой ' + hardEdge + ' (жду -40), ядро G/B ' + phard.data[ci + 3] + '/' + psoft.data[ci + 3]);
 
   /* ST8: ТИПЫ КИСТЕЙ — карандаш тоньше круглой, спрей пятнистый */
   strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y, { brush: 'pencil', size: 12, color: '#6fa8ff', opacity: 100 });
@@ -1407,16 +1984,24 @@ function runSelfTest() {
   var url = work.toDataURL('image/png');
   rec('ST10', url.indexOf('data:image/png') === 0 && url.length > 2000, 'PNG dataURL ' + url.length + ' симв.');
 
-  /* ST11: persist */
+  /* ST11: persist v2 (слои + настройки) */
   persistNow();
-  var ok11 = false, len11 = 0;
+  var ok11 = false, len11 = 0, nl11 = 0;
   try {
     var raw11 = localStorage.getItem(KEY);
     var o11 = raw11 ? JSON.parse(raw11) : null;
-    if (o11 && typeof o11.p === 'string' && o11.p.indexOf('data:image/png') === 0) { ok11 = true; len11 = o11.p.length; }
-    if (o11 && (o11.brush !== state.brush || o11.hardness !== state.hardness)) ok11 = false;
+    if (o11 && o11.v === 2 && Object.prototype.toString.call(o11.layers) === '[object Array]') {
+      nl11 = o11.layers.length;
+      ok11 = nl11 >= 1 && typeof o11.active === 'number';
+      for (var l11 = 0; l11 < nl11 && ok11; l11++) {
+        var dl11 = o11.layers[l11].d;
+        if (typeof dl11 !== 'string' || dl11.indexOf('data:image/png') !== 0) ok11 = false;
+        else len11 += dl11.length;
+      }
+    }
+    if (ok11 && (o11.brush !== state.brush || o11.hardness !== state.hardness)) ok11 = false;
   } catch (err) { }
-  rec('ST11', ok11, 'localStorage сохранён (краска ' + len11 + ' симв., кисть/жёсткость в стейте)');
+  rec('ST11', ok11, 'localStorage v2: ' + nl11 + ' слой(ёв), краска ' + len11 + ' симв., кисть/жёсткость в стейте');
 
   /* ST12: АА-КРОМКА — краска на полупрозрачном краю силуэта не плотнее скетча
      (после заливки тела + жёсткого мазка по кромке) */
@@ -1476,7 +2061,252 @@ function runSelfTest() {
     'перо: полный нажим ' + wFull + ' px, лёгкий ' + wSoft + ' px (жду сильную разницу и undo x2: ' +
     (undo1 && undo2) + ')');
 
+  /* ST15: ИМПОРТ/ЭКСПОРТ ПРОЕКТА + СПРАЙТ «ДЛЯ ИГРЫ»
+     экспорт слоя краски → импорт → пиксели байт-в-байт; один undo-шаг
+     на весь импорт; отказы: «кот»-композит, не-PNG, не-300×200. */
+  var P15 = snapPaint();
+  floodFillAt(152, 100, { color: '#e07a3f', opacity: 100 });
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y, { brush: 'round', size: 8, hardness: 100, color: '#5cf2d0', opacity: 100 });
+  var A15 = snapPaint();
+  var painted15 = 0;
+  for (var q15 = 0; q15 < W * H; q15++) if (A15.data[q15 * 4 + 3] > 0) painted15++;
+  var expA15 = exportFlatCanvas().toDataURL('image/png');
+  clearPaint();
+  strokeLine(BODY.x, BODY.y - 44, BODY.x + 6, BODY.y - 44, { size: 10, hardness: 100, color: '#ff00d0', opacity: 100 });
+  var B15 = snapPaint();
+  var stack15 = undoStack.length;
+  var res15 = await importLayer(expA15);
+  var C15 = snapPaint();
+  var rtOk = res15.ok && dataEqual(C15, A15);
+  var out15 = 0, over15 = 0;
+  for (var z15 = 0; z15 < W * H; z15++) {
+    var zo15 = z15 * 4;
+    if (C15.data[zo15 + 3] > 0) {
+      if (!silArr[z15]) out15++;
+      if (C15.data[zo15 + 3] > alphaCap[z15]) over15++;
+    }
+  }
+  var undoOneOk = undoStack.length === stack15 + 1 && doUndo() && dataEqual(snapPaint(), B15);
+  persistNow();
+  var persistOk15 = false, persistLen15 = 0;
+  try {
+    var raw15 = localStorage.getItem(KEY);
+    var obj15 = raw15 ? JSON.parse(raw15) : null;
+    if (obj15 && obj15.v === 2 && Object.prototype.toString.call(obj15.layers) === '[object Array]' &&
+        obj15.layers.length >= 1 && typeof obj15.layers[0].d === 'string' &&
+        obj15.layers[0].d.indexOf('data:image/png') === 0) {
+      persistOk15 = true;
+      persistLen15 = obj15.layers[0].d.length;
+    }
+  } catch (err15) { }
+  /* отказ: «картинка кота» */
+  composite();
+  var compUrl15 = work.toDataURL('image/png');
+  var before15 = snapPaint();
+  var resC15 = await importLayer(compUrl15);
+  var compRefOk = resC15.ok === false && resC15.reason === 'composite' &&
+    dataEqual(snapPaint(), before15) && /картинка кота/.test(lastToastMsg);
+  /* отказ: не PNG (и text, и JPEG) */
+  var resM15a = await importLayer('data:text/plain;base64,' + btoa('not a png'));
+  var tiny15 = document.createElement('canvas');
+  tiny15.width = 12; tiny15.height = 12;
+  tiny15.getContext('2d').fillRect(0, 0, 12, 12);
+  var resM15b = await importLayer(tiny15.toDataURL('image/jpeg'));
+  var magicRefOk = resM15a.ok === false && resM15a.reason === 'magic' &&
+    resM15b.ok === false && resM15b.reason === 'magic';
+  /* отказ: не 300×200 */
+  var dim15 = document.createElement('canvas');
+  dim15.width = 200; dim15.height = 100;
+  var resD15 = await importLayer(dim15.toDataURL('image/png'));
+  var dimRefOk = resD15.ok === false && resD15.reason === 'dim' && /300×200/.test(lastToastMsg);
+  /* спрайт «для игры»: кроп по bbox + паддинг, опора в кромке */
+  composite();
+  var cvG15 = exportGameCanvas();
+  var bbox15 = silhouetteBBox();
+  var gOk15 = !!cvG15 && !!bbox15, gOut15 = 0, gPaws15 = 0;
+  if (gOk15) {
+    var gW15 = cvG15.width, gH15 = cvG15.height;
+    var expW15 = Math.min(W, bbox15.x1 + 1 + GAME_PAD) - Math.max(0, bbox15.x0 - GAME_PAD);
+    var expH15 = Math.min(H, bbox15.y1 + 1) - Math.max(0, bbox15.y0 - GAME_PAD);
+    gOk15 = gW15 === expW15 && gH15 === expH15;
+    var offX15 = bbox15.x0 - Math.max(0, bbox15.x0 - GAME_PAD);
+    var offY15 = bbox15.y0 - Math.max(0, bbox15.y0 - GAME_PAD);
+    var gd15 = cvG15.getContext('2d').getImageData(0, 0, gW15, gH15).data;
+    for (var gy15 = 0; gy15 < gH15; gy15++) {
+      for (var gx15 = 0; gx15 < gW15; gx15++) {
+        if (gd15[(gy15 * gW15 + gx15) * 4 + 3] <= 0) continue;
+        var inB15 = gx15 >= offX15 && gx15 <= offX15 + (bbox15.x1 - bbox15.x0) &&
+          gy15 >= offY15 && gy15 <= offY15 + (bbox15.y1 - bbox15.y0);
+        if (inB15) { if (gy15 === gH15 - 1) gPaws15++; }
+        else gOut15++;
+      }
+    }
+    gOk15 = gOk15 && gOut15 === 0 && gPaws15 > 0;
+  }
+  rec('ST15', rtOk && out15 === 0 && over15 === 0 && undoOneOk && persistOk15 &&
+    compRefOk && magicRefOk && dimRefOk && gOk15,
+    'проект: roundtrip ' + rtOk + ' (' + painted15 + ' px краски, вне кота ' + out15 + ', над-кап ' + over15 + '), undo-1-на-импорт: ' + undoOneOk +
+    ', persist: ' + persistOk15 + ' (' + persistLen15 + ' симв.); отказы: кот-композит ' + compRefOk + ' (match=' + (resC15 && resC15.match != null ? resC15.match : '-') + ')' +
+    ', не-PNG ' + magicRefOk + ', не-300×200 ' + dimRefOk + '; спрайт ' + (cvG15 ? cvG15.width + '×' + cvG15.height : '—') +
+    ' (bbox силуэта ' + (bbox15 ? bbox15.x0 + ',' + bbox15.y0 + '–' + bbox15.x1 + ',' + bbox15.y1 : '—') + '), вне bbox ' + gOut15 + ' px, опора в кромке ' + gPaws15 + ' px');
+
+  /* ST16: СЛОИ — два слоя, порядок/сила/видимость/удаление, undo структур,
+     persist v2. Зелёный — верхний слой, красный — нижний, обе через (BODY+5). */
+  var mark16 = undoStack.length;
+  var A16 = snapWork();
+  addLayerUI();                                    /* теперь слоёв 2, актив верхний */
+  var twoOk16 = layers.length === 2 && activeLy === 1;
+  strokeLine(BODY.x, BODY.y, BODY.x + 10, BODY.y, { size: 10, hardness: 100, color: '#00cc44', opacity: 100 });  /* зелёный — верхний */
+  activateLayer(0);
+  strokeLine(BODY.x + 2, BODY.y, BODY.x + 12, BODY.y, { size: 10, hardness: 100, color: '#cc2244', opacity: 100 }); /* красный — нижний */
+  activateLayer(1);
+  composite();
+  var ov16 = (BODY.y * W + BODY.x + 5) * 4;       /* точка перекрытия мазков */
+  var GREEN = [0, 204, 68], RED = [204, 34, 68];
+  var cmp16 = snapWork().data;
+  var topWin16 = Math.abs(cmp16[ov16] - GREEN[0]) <= 6 && Math.abs(cmp16[ov16 + 1] - GREEN[1]) <= 6 && Math.abs(cmp16[ov16 + 2] - GREEN[2]) <= 6;
+  setLayerOpacity(1, 50);                         /* сила верхнего 50% */
+  cmp16 = snapWork().data;
+  var halfOk16 = Math.abs(cmp16[ov16] - (GREEN[0] + RED[0]) / 2) <= 8 &&
+    Math.abs(cmp16[ov16 + 1] - (GREEN[1] + RED[1]) / 2) <= 8 &&
+    Math.abs(cmp16[ov16 + 2] - (GREEN[2] + RED[2]) / 2) <= 8;
+  setLayerOpacity(1, 100);
+  setLayerVisible(1, false);                      /* верхний спрятан — виден красный */
+  cmp16 = snapWork().data;
+  var lowWin16 = Math.abs(cmp16[ov16] - RED[0]) <= 6 && Math.abs(cmp16[ov16 + 1] - RED[1]) <= 6 && Math.abs(cmp16[ov16 + 2] - RED[2]) <= 6;
+  setLayerVisible(1, true);
+  activateLayer(0);                              /* нижний — активный, порядок не меняю */
+  moveLayerUI(1);
+  cmp16 = snapWork().data;
+  var swap16 = Math.abs(cmp16[ov16] - RED[0]) <= 6 && Math.abs(cmp16[ov16 + 1] - RED[1]) <= 6 && Math.abs(cmp16[ov16 + 2] - RED[2]) <= 6;
+  moveLayerUI(-1);                                /* порядок обратно */
+  activateLayer(1);
+  var delOk16 = false, delUndo16 = false, nBefore16 = undoStack.length;
+  delLayerUI();                                   /* удалить ВЕРХНИЙ (зелёный) */
+  var one16 = layers.length === 1;
+  cmp16 = snapWork().data;
+  var onlyRed16 = Math.abs(cmp16[ov16] - RED[0]) <= 6 && Math.abs(cmp16[ov16 + 1] - RED[1]) <= 6 && Math.abs(cmp16[ov16 + 2] - RED[2]) <= 6;
+  var dt16 = layers[0].ctx.getImageData(BODY.x + 5, BODY.y, 1, 1).data;
+  var lowAlone16 = Math.abs(dt16[0] - RED[0]) <= 6 && Math.abs(dt16[1] - RED[1]) <= 6 && Math.abs(dt16[2] - RED[2]) <= 6;
+  if (one16 && onlyRed16 && lowAlone16) delOk16 = true;
+  while (undoStack.length > nBefore16 && undoStack.length > 0) doUndo();
+  if (layers.length === 2) {
+    var back16 = layers[1].ctx.getImageData(BODY.x + 5, BODY.y, 1, 1).data;
+    delUndo16 = Math.abs(back16[0] - GREEN[0]) <= 6 && Math.abs(back16[1] - GREEN[1]) <= 6 && Math.abs(back16[2] - GREEN[2]) <= 6;
+    cmp16 = snapWork().data;
+    delUndo16 = delUndo16 && Math.abs(cmp16[ov16] - GREEN[0]) <= 6 && Math.abs(cmp16[ov16 + 1] - GREEN[1]) <= 6 && Math.abs(cmp16[ov16 + 2] - GREEN[2]) <= 6;
+  }
+  /* persist v2 с двумя слоями */
+  persistNow();
+  var per16 = false, perN16 = 0;
+  try {
+    var raw16 = localStorage.getItem(KEY);
+    var o16 = raw16 ? JSON.parse(raw16) : null;
+    if (o16 && o16.v === 2 && o16.layers && o16.layers.length === 2) {
+      perN16 = o16.layers.length;
+      per16 = o16.layers.every(function (m) { return typeof m.d === 'string' && m.d.indexOf('data:image/png') === 0; });
+    }
+  } catch (e16) { }
+  /* полный откат всего ST16 до границы — картина вернулась байт-в-байт */
+  var roll16 = true;
+  while (undoStack.length > mark16 && undoStack.length > 0) roll16 = doUndo() && roll16;
+  activateLayer(0);
+  var clean16 = layers.length === 1;
+  var backA16 = dataEqual(snapWork(), A16);
+  rec('ST16', twoOk16 && topWin16 && halfOk16 && lowWin16 && swap16 && delOk16 && delUndo16 && per16 && clean16 && roll16 && backA16,
+    'слои: 2 ' + twoOk16 + ', верх поверх ' + topWin16 + ', сила 50% лерп ' + halfOk16 + ', скрытие ' + lowWin16 +
+    ', перенос ' + swap16 + ', удалить+undo ' + delOk16 + '/' + delUndo16 + ', persist ' + per16 + ' (' + perN16 + '), откат ' + roll16 + '/' + backA16);
+
+  /* ST17: ТАЧ-МАЗОК, ХОТКЕИ ПО ФИЗИЧЕСКОМУ КОДУ (ру-раскладка), ТАБЫ ПАЛИТР */
+  var A17 = snapWork();
+  var rect17 = work.getBoundingClientRect();
+  var sx17 = rect17.left + rect17.width * ((BODY.x + 6) / W);
+  var sy17 = rect17.top + rect17.height * (BODY.y / H);
+  work.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 401, pointerType: 'touch', clientX: sx17, clientY: sy17, isPrimary: true, bubbles: true }));
+  work.dispatchEvent(new PointerEvent('pointermove', { pointerId: 401, pointerType: 'touch', clientX: sx17 + 40, clientY: sy17, isPrimary: true, bubbles: true }));
+  work.dispatchEvent(new PointerEvent('pointerup', { pointerId: 401, isPrimary: true, bubbles: true }));
+  var touchN17 = 0;
+  var B17 = snapWork();
+  for (var t17 = 0; t17 < W * H; t17++) if (diffPx(A17, B17, t17) > 0) touchN17++;
+  var touchUndo17 = doUndo() && dataEqual(snapWork(), A17);
+  /* Ctrl+Z на русской раскладке: физическая KeyZ даёт key='я' — матчинг по e.code */
+  strokeLine(BODY.x, BODY.y, BODY.x + 10, BODY.y, { size: 10, hardness: 100, color: '#6fa8ff', opacity: 100 });
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ', key: 'я', ctrlKey: true, bubbles: true, cancelable: true }));
+  var hotUndo17 = dataEqual(snapWork(), A17);
+  /* табы палитр: выключенная панель реально исчезает (баг hidden vs display:flex) */
+  setColorPane('cw');
+  var cwH17 = $('paneCW').getBoundingClientRect().height;
+  var ownH17 = $('paneOwn').getBoundingClientRect().height;
+  setColorPane('own');
+  var cwH17b = $('paneCW').getBoundingClientRect().height;
+  var ownH17b = $('paneOwn').getBoundingClientRect().height;
+  var tabsOk17 = cwH17 > 4 && ownH17 === 0 && cwH17b === 0 && ownH17b > 4;
+  rec('ST17', touchN17 > 50 && touchUndo17 && hotUndo17 && tabsOk17,
+    'тач: ' + touchN17 + ' px, undo ' + touchUndo17 + '; Ctrl+Z (code=KeyZ/key=я): ' + hotUndo17 +
+    '; табы корректны ' + tabsOk17 + ' (cw ' + Math.round(cwH17) + '→' + Math.round(cwH17b) + ', свой ' + Math.round(ownH17) + '→' + Math.round(ownH17b) + ')');
+  setColorPane('own');
+
+  /* ST18: НАЛОЖЕНИЕ СЛОЁВ (blend modes) + мини-предпросмотры в списке */
+  var n18 = layers.length;
+  var lowBefore18 = layers[0].ctx.getImageData(0, 0, W, H);
+  addLayerUI();                                    /* верхний слой, активен */
+  var added18 = layers.length === n18 + 1 && activeLy === layers.length - 1;
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y, { size: 12, hardness: 100, color: '#00cc44', opacity: 100 });
+  var top18 = layers.length - 1;
+  var G18 = [0, 204, 68];                          /* #00cc44 */
+  var ov18 = (BODY.y * W + BODY.x + 7) * 4;
+  var bd18 = baseImageData.data;
+  var bp18 = [bd18[ov18], bd18[ov18 + 1], bd18[ov18 + 2]];
+  pushStructUndo();
+  setLayerMode(top18, 'multiply');
+  var cmp18 = snapWork().data;
+  var mulOk18 = Math.abs(cmp18[ov18] - G18[0] * bp18[0] / 255) <= 8 &&
+    Math.abs(cmp18[ov18 + 1] - G18[1] * bp18[1] / 255) <= 8 &&
+    Math.abs(cmp18[ov18 + 2] - G18[2] * bp18[2] / 255) <= 8;
+  var modeUndo18 = doUndo() && layers[top18].mode === 'source-over';
+  setLayerMode(top18, 'screen');
+  cmp18 = snapWork().data;
+  var scrOk18 = true;
+  for (var ch18 = 0; ch18 < 3; ch18++) {
+    var exp18 = 255 - (255 - G18[ch18]) * (255 - bp18[ch18]) / 255;
+    if (Math.abs(cmp18[ov18 + ch18] - exp18) > 8) scrOk18 = false;
+  }
+  setLayerMode(top18, 'overlay');
+  var selOk18 = $('layerMode').value === 'overlay';
+  persistNow();
+  var per18 = false;
+  try {
+    var po18 = JSON.parse(localStorage.getItem(KEY));
+    per18 = !!(po18 && po18.layers[top18] && po18.layers[top18].m === 'overlay');
+  } catch (err18) { }
+  /* мини-предпросмотры: по канвасу на слой; зелень видна в верхнем,
+     нижний слой пуст — только шахматка */
+  renderLayers();
+  var th18 = $('layerList').querySelectorAll('canvas.lyth');
+  var thCount18 = th18.length === layers.length;
+  var topTh18 = th18[0].getContext('2d').getImageData(0, 0, 42, 28).data;
+  var greenN18 = 0;
+  for (var g18 = 0; g18 < 42 * 28; g18++) {
+    var o18 = g18 * 4;
+    if (topTh18[o18 + 3] > 0 && topTh18[o18 + 1] > topTh18[o18] + 30 && topTh18[o18 + 1] > topTh18[o18 + 2] + 30) greenN18++;
+  }
+  var botTh18 = th18[th18.length - 1].getContext('2d').getImageData(0, 0, 42, 28).data;
+  var botInk18 = 0;
+  for (var b18 = 3; b18 < botTh18.length; b18 += 4) if (botTh18[b18] > 0) botInk18++;
+  /* ST18 работает только с верхним слоем: нижний должен остаться
+     байт-в-байт как был (гейт независим от мусора в localStorage) */
+  var lowAfter18 = layers[0].ctx.getImageData(0, 0, W, H);
+  var lowSame18 = dataEqual(lowBefore18, lowAfter18);
+  rec('ST18', added18 && mulOk18 && modeUndo18 && scrOk18 && selOk18 && per18 && thCount18 && greenN18 > 0 && lowSame18,
+    'наложение: слой добавлен ' + added18 + ', multiply=SD/255 ' + mulOk18 + ', undo-режим ' + modeUndo18 +
+    ', screen ' + scrOk18 + ', селект=overlay ' + selOk18 + ', persist ' + per18 +
+    '; мини: слоёв ' + th18.length + '/' + layers.length + ', зелень в верхнем ' + greenN18 + ' px, нижний нетронут ' + lowSame18 + ' (чернила ' + botInk18 + ')');
+
+  /* финал: один чистый слой, стеки пусты */
   undoStack.length = 0; redoStack.length = 0;
+  if (layers.length !== 1 || pctx.getImageData(0, 0, 1, 1).data[3] !== 0) {
+    layers = [mkLayer()]; activeLy = 0; syncActiveAlias(); renderLayers();
+  }
   pctx.clearRect(0, 0, W, H);
   composite(); persistNow(); updateUndoUI();
 
@@ -1491,6 +2321,7 @@ function ready() {
   composite();
   tryRestore();
   renderHistory();
+  renderLayers();
   updateUndoUI();
   setSize(state.size);
   drawBrushPrev();
@@ -1512,7 +2343,20 @@ window.PAINT = {
   state: state,
   assets: assets,
   work: work,
-  paintCanvas: paintCv,
+  paintCanvas: function () { return paintCv; },      /* канвас АКТИВНОГО слоя */
+  layers: function () { return layers.slice(); },    /* [ {name, visible, opacity, cv, ctx, id} ] */
+  activeLayer: function () { return activeLy; },
+  addLayer: function () { addLayerUI(); return activeLy; },
+  deleteLayer: function () { delLayerUI(); },
+  activateLayer: function (i) { activateLayer(i); },
+  setLayerVisible: setLayerVisible,
+  setLayerOpacity: setLayerOpacity,
+  setLayerMode: setLayerMode,
+  layerMode: function () { return layers[activeLy].mode; },
+  layerModes: function () { return LAYER_MODES.map(function (m) { return m.slice(); }); },
+  moveLayer: function (dir) { moveLayerUI(dir); },
+  mergeDown: function () { mergeDownUI(); },
+  exportFlatCanvas: exportFlatCanvas,
   liveCanvas: function () { return liveCv; },
   baseImageData: function () { return baseImageData; },
   stroke: strokeLine,
@@ -1531,6 +2375,12 @@ window.PAINT = {
   masks: { sil: function () { return silArr; }, dark: function () { return darkArr; }, cap: function () { return alphaCap; } },
   setColorPane: setColorPane,
   cwPalettes: function () { return CW_PALETTES.slice(); },
+  importLayer: importLayer,
+  exportGameCanvas: exportGameCanvas,
+  exportGameDataURL: exportGameDataURL,
+  silhouetteBBox: silhouetteBBox,
+  lastToast: function () { return lastToastMsg; },
+  toast: toast,
   runSelfTest: runSelfTest
 };
 })();
