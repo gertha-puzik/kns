@@ -4,7 +4,7 @@
 
 ## 1. Что это за проект
 
-«KNS» — конструктор окрасов кошек для онлайн-игры **coop-field** заказчицы (живёт на https://abnocw.miew.ru, репо github.com/gertha-puzik/coop-field). Референс механики и кода окраса — официальный конструктор CatWar: https://catwar.su/cw3/kns. Продукт заказчицы: редактор **https://kns.miew.ru** + витрина прогресса **https://kns.miew.ru/archive/**. Репо продукта: **github.com/gertha-puzik/kns** (PRIVATный), деплой push→main по CI (rsync на VPS).
+«KNS» — конструктор окрасов кошек для онлайн-игры **coop-field** заказчицы (живёт на https://abnocw.phainonsmilk.ru, репо github.com/gertha-puzik/coop-field). Референс механики и кода окраса — официальный конструктор CatWar: https://catwar.su/cw3/kns. Продукт заказчицы: редактор **https://kns.miew.ru** + витрина прогресса **https://kns.miew.ru/archive/**. Репо продукта: **github.com/gertha-puzik/kns** (PRIVATный), деплой push→main по CI (rsync на VPS).
 
 Роли: **заказчица** — владелица игры, говорит по-русски коротко и неформально, женского рода, ждёт законченный проверенный результат (цифры приёмки), а не план; **Hermes-агент** — основной исполнитель с этой Memory/skill; **любая другая ИИ** — получает этот файл.
 
