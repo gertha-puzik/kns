@@ -170,7 +170,16 @@
   }
   .gbtn:hover { filter: brightness(1.08); }
   .exp { display: flex; gap: 6px; }
+  .exp + .exp { margin-top: 6px; }
   .exp .abtn { flex: 1; }
+  #toast {
+    position: fixed; left: 50%; top: 18px; transform: translateX(-50%) translateY(-10px);
+    max-width: 440px; padding: 9px 14px; border-radius: 9px; z-index: 50;
+    background: #23252b; border: 1px solid #f5a94b; color: #ffe9c9;
+    font-size: 12.5px; line-height: 1.45; box-shadow: 0 8px 26px rgba(0,0,0,.55);
+    opacity: 0; pointer-events: none; transition: .18s;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   @media (max-width: 1040px) {
     .main { flex-direction: column; }
@@ -300,13 +309,19 @@
           <button type="button" class="abtn danger" id="btnClear" title="Убрать всю краску, кот как был">стереть всё</button>
         </div>
         <div class="exp">
+          <button type="button" class="abtn" id="btnImpOpen" title="Открыть файл слоя краски из KNS Paint (PNG 300×200): краска заменится, отмена вернёт прежнюю">открыть проект</button>
           <button type="button" class="abtn" id="btnExpPaint" title="Только слой окраса, фон прозрачный">слой окраса</button>
+        </div>
+        <div class="exp">
+          <button type="button" class="gbtn" id="btnExpGame" title="Спрайт для игры: кот с окрасом, обрезка по силуэту, лапы у нижней кромки">скачать для игры</button>
           <button type="button" class="gbtn" id="btnExpWork" title="PNG с котом и окрасом">скачать кота</button>
         </div>
+        <input type="file" id="fileImport" accept="image/png" hidden>
       </div>
     </aside>
   </div>
 
+  <div id="toast"></div>
   <pre id="selftest"></pre>
 </div>
 
@@ -315,7 +330,7 @@
 (function () {
 'use strict';
 /* ============================================================
-   KNS Paint v6 — кисть по коту с контрактом:
+   KNS Paint v8 — кисть по коту с контрактом:
    1) краска не выходит за силуэт кота И не плотнее скетча
       на АА-кромке (cap по альфе — нет артефактов у ушей/спины);
    2) контур кота (тёмные линии скетча) всегда ПОВЕРХ краски;
@@ -324,7 +339,12 @@
    4) ластик стирает краску до базы, кот и контур не трогаются;
    5) seed штампов зависит только от позиции на пути — карандаш
       и спрей не «дёргаются» при движении курсора;
-   6) цвет: таб «Свой» (HSV) и «CatWar» (палитры окрасов CatWar).
+   6) цвет: таб «Свой» (HSV) и «CatWar» (палитры окрасов CatWar);
+   7) импорт проекта: PNG «слой краски» 300×200 — REPLACE краски,
+      один undo-шаг на весь импорт, клип по силуэту и кап по альфе
+      скетча; «картинка кота» распознаётся и отклоняется с тостом;
+   8) экспорт «для игры»: композит, кроп по bbox силуэта скетча,
+      паддинг 2px слева/сверху/справа, снизу 0 — опора лап у кромки.
    ============================================================ */
 
 var D = window.PAINT_DATA || (typeof PAINT_DATA !== 'undefined' ? PAINT_DATA : null);
@@ -1229,6 +1249,142 @@ function download(canvas, name) {
 $('btnExpWork').onclick = function () { download(work, 'kns-paint.png'); };
 $('btnExpPaint').onclick = function () { download(paintCv, 'kns-paint-layer.png'); };
 
+/* ---------- v8: тост ---------- */
+var toastTimer = null, lastToastMsg = '';
+function toast(msg) {
+  lastToastMsg = String(msg);
+  var t = $('toast');
+  if (!t) return;
+  t.textContent = lastToastMsg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('show'); toastTimer = null; }, 4200);
+}
+
+/* ---------- v8: импорт проекта (PNG «слой краски» 300×200) ---------- */
+var IMPORT_MAX_BYTES = 4 * 1024 * 1024;
+var NEED_MSG = 'нужен файл слоя краски из KNS Paint (300×200)';
+function dataUrlB64(url) {
+  var m = /^data:[^,]*;base64,(.*)$/.exec(String(url || ''));
+  return m ? m[1] : null;
+}
+/* PNG-магия 89 50 4E 47 0D 0A 1A 0A по содержимому, не по mime-префиксу */
+function pngMagicOk(b64) {
+  var head;
+  try { head = atob(b64.slice(0, 12)); } catch (e) { return false; }
+  if (head.length < 8) return false;
+  return head.charCodeAt(0) === 0x89 && head.charCodeAt(1) === 0x50 &&
+    head.charCodeAt(2) === 0x4E && head.charCodeAt(3) === 0x47 &&
+    head.charCodeAt(4) === 0x0D && head.charCodeAt(5) === 0x0A &&
+    head.charCodeAt(6) === 0x1A && head.charCodeAt(7) === 0x0A;
+}
+/* детект «картинки кота» (экспорт work): у композита непрокрашенные
+   пиксели твёрдого тела непрозрачны И равны базе; у слоя краски таких
+   нет — непрокрашенное прозрачно. Калибровка на живой паре экспортов:
+   слой 0 совпадений, композит 3632+ при заливке тела; порог 1200. */
+var COMPOSITE_MIN_MATCH = 1200;
+function compositeMatchCount(d) {
+  var bd = baseImageData.data, n = W * H, match = 0, opaque = 0;
+  for (var i = 0; i < n; i++) {
+    if (alphaCap[i] < 250) continue;
+    var o = i * 4;
+    if (d[o + 3] < 250) continue;
+    opaque++;
+    if (Math.abs(d[o] - bd[o]) <= 6 && Math.abs(d[o + 1] - bd[o + 1]) <= 6 &&
+      Math.abs(d[o + 2] - bd[o + 2]) <= 6) match++;
+  }
+  return { match: match, opaque: opaque };
+}
+/* REPLACE слоя краски, ОДИН undo-снапшот на весь импорт, клип по
+   силуэту + кап по альфе скетча, штатный persist. Promise {ok, reason} */
+function importLayer(dataURL) {
+  return new Promise(function (resolve) {
+    var bad = function (reason, msg) { toast(msg); resolve({ ok: false, reason: reason, msg: msg }); };
+    var b64 = dataUrlB64(dataURL);
+    if (!b64 || !pngMagicOk(b64)) { bad('magic', 'не PNG — ' + NEED_MSG); return; }
+    if (b64.length * 3 / 4 > IMPORT_MAX_BYTES) { bad('big', 'файл больше 4 МБ — ' + NEED_MSG); return; }
+    var img = new Image();
+    img.onload = function () {
+      if (img.naturalWidth !== W || img.naturalHeight !== H) { bad('dim', NEED_MSG); return; }
+      var t = mkCv(), tc = ctx2d(t);
+      tc.drawImage(img, 0, 0);
+      var d = tc.getImageData(0, 0, W, H).data;
+      var mc = compositeMatchCount(d);
+      if (mc.match >= COMPOSITE_MIN_MATCH) {
+        var cmsg = 'это картинка кота — для редактирования открой файл “слой краски”';
+        toast(cmsg);
+        resolve({ ok: false, reason: 'composite', msg: cmsg, match: mc.match });
+        return;
+      }
+      pushUndo();
+      var out = pctx.createImageData(W, H), od = out.data;
+      for (var i = 0; i < W * H; i++) {
+        var o = i * 4, a = d[o + 3];
+        if (!alphaCap[i]) continue;          /* клип по силуэту кота */
+        if (a > alphaCap[i]) a = alphaCap[i]; /* кап по альфе скетча */
+        od[o] = d[o]; od[o + 1] = d[o + 1]; od[o + 2] = d[o + 2]; od[o + 3] = a;
+      }
+      pctx.clearRect(0, 0, W, H);
+      pctx.putImageData(out, 0, 0);
+      composite(); schedulePersist();
+      resolve({ ok: true, imported: true });
+    };
+    img.onerror = function () { bad('decode', 'файл не читается — ' + NEED_MSG); };
+    img.src = dataURL;
+  });
+}
+$('btnImpOpen').onclick = function () { $('fileImport').click(); };
+$('fileImport').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  this.value = '';                      /* повторный выбор того же файла */
+  if (!f) return;
+  if (f.size > IMPORT_MAX_BYTES) { toast('файл больше 4 МБ — ' + NEED_MSG); return; }
+  var fr = new FileReader();
+  fr.onload = function () { importLayer(fr.result); };
+  fr.onerror = function () { toast('файл не читается — ' + NEED_MSG); };
+  fr.readAsDataURL(f);
+});
+
+/* ---------- v8: экспорт «для игры» (спрайт coop-field) ---------- */
+var GAME_PAD = 2;
+function silhouetteBBox() {
+  var bd = baseImageData.data;
+  var x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (var y = 0; y < H; y++) {
+    for (var x = 0; x < W; x++) {
+      if (bd[(y * W + x) * 4 + 3] > 0) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+  }
+  return x1 < 0 ? null : { x0: x0, y0: y0, x1: x1, y1: y1 };
+}
+/* композит → кроп по bbox силуэта скетча (замер из данных, не хардкод):
+   паддинг 2px слева/сверху/справа, снизу 0 — опора лап у нижней кромки */
+function exportGameCanvas() {
+  composite();
+  var b = silhouetteBBox();
+  if (!b) return null;
+  var x0 = Math.max(0, b.x0 - GAME_PAD), y0 = Math.max(0, b.y0 - GAME_PAD);
+  var x1 = Math.min(W, b.x1 + 1 + GAME_PAD), y1 = Math.min(H, b.y1 + 1);
+  var cw = x1 - x0, chh = y1 - y0;
+  var cv = document.createElement('canvas');
+  cv.width = cw; cv.height = chh;
+  var cc = cv.getContext('2d');
+  cc.drawImage(work, x0, y0, cw, chh, 0, 0, cw, chh);
+  return cv;
+}
+function exportGameDataURL() {
+  var cv = exportGameCanvas();
+  return cv ? cv.toDataURL('image/png') : null;
+}
+$('btnExpGame').onclick = function () {
+  var cv = exportGameCanvas();
+  if (cv) download(cv, 'kns-paint-sprite.png');
+  else toast('нечего экспортировать — скетч не читается');
+};
+
 /* ============================================================
    SELFTEST (?selftest=1)
    ============================================================ */
@@ -1262,6 +1418,10 @@ function lightBodyPoint() {
   return { x: ox, y: oy };
 }
 function runSelfTest() {
+  /* async — ST15 ждёт декодирования импортируемых PNG */
+  return runSelfTestAsync().then(function (r) { return r; });
+}
+async function runSelfTestAsync() {
   var lines = [], pass = 0, total = 0;
   function rec(name, ok, detail) {
     total++;
@@ -1476,6 +1636,92 @@ function runSelfTest() {
     'перо: полный нажим ' + wFull + ' px, лёгкий ' + wSoft + ' px (жду сильную разницу и undo x2: ' +
     (undo1 && undo2) + ')');
 
+  /* ST15: ИМПОРТ/ЭКСПОРТ ПРОЕКТА + СПРАЙТ «ДЛЯ ИГРЫ»
+     экспорт слоя краски → импорт → пиксели байт-в-байт; один undo-шаг
+     на весь импорт; отказы: «кот»-композит, не-PNG, не-300×200. */
+  var P15 = snapPaint();
+  floodFillAt(152, 100, { color: '#e07a3f', opacity: 100 });
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y, { brush: 'round', size: 8, hardness: 100, color: '#5cf2d0', opacity: 100 });
+  var A15 = snapPaint();
+  var painted15 = 0;
+  for (var q15 = 0; q15 < W * H; q15++) if (A15.data[q15 * 4 + 3] > 0) painted15++;
+  var expA15 = paintCv.toDataURL('image/png');
+  clearPaint();
+  strokeLine(BODY.x, BODY.y - 44, BODY.x + 6, BODY.y - 44, { size: 10, hardness: 100, color: '#ff00d0', opacity: 100 });
+  var B15 = snapPaint();
+  var stack15 = undoStack.length;
+  var res15 = await importLayer(expA15);
+  var C15 = snapPaint();
+  var rtOk = res15.ok && dataEqual(C15, A15);
+  var out15 = 0, over15 = 0;
+  for (var z15 = 0; z15 < W * H; z15++) {
+    var zo15 = z15 * 4;
+    if (C15.data[zo15 + 3] > 0) {
+      if (!silArr[z15]) out15++;
+      if (C15.data[zo15 + 3] > alphaCap[z15]) over15++;
+    }
+  }
+  var undoOneOk = undoStack.length === stack15 + 1 && doUndo() && dataEqual(snapPaint(), B15);
+  persistNow();
+  var persistOk15 = false, persistLen15 = 0;
+  try {
+    var raw15 = localStorage.getItem(KEY);
+    var obj15 = raw15 ? JSON.parse(raw15) : null;
+    if (obj15 && typeof obj15.p === 'string' && obj15.p.indexOf('data:image/png') === 0) {
+      persistOk15 = true; persistLen15 = obj15.p.length;
+    }
+  } catch (err15) { }
+  /* отказ: «картинка кота» */
+  composite();
+  var compUrl15 = work.toDataURL('image/png');
+  var before15 = snapPaint();
+  var resC15 = await importLayer(compUrl15);
+  var compRefOk = resC15.ok === false && resC15.reason === 'composite' &&
+    dataEqual(snapPaint(), before15) && /картинка кота/.test(lastToastMsg);
+  /* отказ: не PNG (и text, и JPEG) */
+  var resM15a = await importLayer('data:text/plain;base64,' + btoa('not a png'));
+  var tiny15 = document.createElement('canvas');
+  tiny15.width = 12; tiny15.height = 12;
+  tiny15.getContext('2d').fillRect(0, 0, 12, 12);
+  var resM15b = await importLayer(tiny15.toDataURL('image/jpeg'));
+  var magicRefOk = resM15a.ok === false && resM15a.reason === 'magic' &&
+    resM15b.ok === false && resM15b.reason === 'magic';
+  /* отказ: не 300×200 */
+  var dim15 = document.createElement('canvas');
+  dim15.width = 200; dim15.height = 100;
+  var resD15 = await importLayer(dim15.toDataURL('image/png'));
+  var dimRefOk = resD15.ok === false && resD15.reason === 'dim' && /300×200/.test(lastToastMsg);
+  /* спрайт «для игры»: кроп по bbox + паддинг, опора в кромке */
+  composite();
+  var cvG15 = exportGameCanvas();
+  var bbox15 = silhouetteBBox();
+  var gOk15 = !!cvG15 && !!bbox15, gOut15 = 0, gPaws15 = 0;
+  if (gOk15) {
+    var gW15 = cvG15.width, gH15 = cvG15.height;
+    var expW15 = Math.min(W, bbox15.x1 + 1 + GAME_PAD) - Math.max(0, bbox15.x0 - GAME_PAD);
+    var expH15 = Math.min(H, bbox15.y1 + 1) - Math.max(0, bbox15.y0 - GAME_PAD);
+    gOk15 = gW15 === expW15 && gH15 === expH15;
+    var offX15 = bbox15.x0 - Math.max(0, bbox15.x0 - GAME_PAD);
+    var offY15 = bbox15.y0 - Math.max(0, bbox15.y0 - GAME_PAD);
+    var gd15 = cvG15.getContext('2d').getImageData(0, 0, gW15, gH15).data;
+    for (var gy15 = 0; gy15 < gH15; gy15++) {
+      for (var gx15 = 0; gx15 < gW15; gx15++) {
+        if (gd15[(gy15 * gW15 + gx15) * 4 + 3] <= 0) continue;
+        var inB15 = gx15 >= offX15 && gx15 <= offX15 + (bbox15.x1 - bbox15.x0) &&
+          gy15 >= offY15 && gy15 <= offY15 + (bbox15.y1 - bbox15.y0);
+        if (inB15) { if (gy15 === gH15 - 1) gPaws15++; }
+        else gOut15++;
+      }
+    }
+    gOk15 = gOk15 && gOut15 === 0 && gPaws15 > 0;
+  }
+  rec('ST15', rtOk && out15 === 0 && over15 === 0 && undoOneOk && persistOk15 &&
+    compRefOk && magicRefOk && dimRefOk && gOk15,
+    'проект: roundtrip ' + rtOk + ' (' + painted15 + ' px краски, вне кота ' + out15 + ', над-кап ' + over15 + '), undo-1-на-импорт: ' + undoOneOk +
+    ', persist: ' + persistOk15 + ' (' + persistLen15 + ' симв.); отказы: кот-композит ' + compRefOk + ' (match=' + (resC15 && resC15.match != null ? resC15.match : '-') + ')' +
+    ', не-PNG ' + magicRefOk + ', не-300×200 ' + dimRefOk + '; спрайт ' + (cvG15 ? cvG15.width + '×' + cvG15.height : '—') +
+    ' (bbox силуэта ' + (bbox15 ? bbox15.x0 + ',' + bbox15.y0 + '–' + bbox15.x1 + ',' + bbox15.y1 : '—') + '), вне bbox ' + gOut15 + ' px, опора в кромке ' + gPaws15 + ' px');
+
   undoStack.length = 0; redoStack.length = 0;
   pctx.clearRect(0, 0, W, H);
   composite(); persistNow(); updateUndoUI();
@@ -1531,6 +1777,12 @@ window.PAINT = {
   masks: { sil: function () { return silArr; }, dark: function () { return darkArr; }, cap: function () { return alphaCap; } },
   setColorPane: setColorPane,
   cwPalettes: function () { return CW_PALETTES.slice(); },
+  importLayer: importLayer,
+  exportGameCanvas: exportGameCanvas,
+  exportGameDataURL: exportGameDataURL,
+  silhouetteBBox: silhouetteBBox,
+  lastToast: function () { return lastToastMsg; },
+  toast: toast,
   runSelfTest: runSelfTest
 };
 })();
