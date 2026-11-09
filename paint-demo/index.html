@@ -42,10 +42,10 @@
     border-radius: 14px;
     box-shadow: 0 14px 40px rgba(0,0,0,.45);
     padding: 14px;
-    display: flex; flex-direction: column; gap: 13px;
+    display: flex; flex-direction: column; gap: 12px;
   }
   .section { display: flex; flex-direction: column; gap: 7px; }
-  .section + .section { border-top: 1px solid rgba(255,255,255,.06); padding-top: 12px; }
+  .section + .section { border-top: 1px solid rgba(255,255,255,.06); padding-top: 11px; }
   .cap { font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #9aa5c0; }
 
   .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -57,6 +57,18 @@
   .tbtn:hover { background: rgba(255,255,255,.09); color: #fff; }
   .tbtn.active { background: #f5b04c; border-color: #f5b04c; color: #14161d; box-shadow: 0 4px 14px rgba(245,176,76,.35); }
   .tbtn svg { width: 20px; height: 20px; }
+
+  .brow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .bbtn {
+    height: 44px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+    background: rgba(255,255,255,.04); color: #cfd5e4; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    transition: .15s; padding: 0 2px;
+  }
+  .bbtn:hover { background: rgba(255,255,255,.09); color: #fff; }
+  .bbtn.active { border-color: #f5b04c; background: rgba(245,176,76,.14); color: #ffd9a3; }
+  .bbtn svg { width: 18px; height: 18px; }
+  .bbtn span { font-size: 9px; letter-spacing: .2px; }
 
   .sizes { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
   .sbtn {
@@ -127,7 +139,7 @@
 <body>
 <div class="wrap">
   <h1>&#128062; KNS Paint</h1>
-  <p class="sub">Рисуй окрас поверх кота как в Paint — любой цвет, любой мазок, можно полупрозрачно. Никаких границ: хочешь — выходи за края и рисуй свои контуры сам.</p>
+  <p class="sub">Рисуй окрас по коту как в Paint — краска не выходит за кота, контур всегда поверх рисунка.</p>
 
   <div class="row">
     <div class="stage">
@@ -139,13 +151,13 @@
       <div class="section">
         <div class="cap">Инструменты</div>
         <div class="tools">
-          <button type="button" class="tbtn active" id="toolBrush" title="Кисть (1) — рисуй где угодно">
+          <button type="button" class="tbtn active" id="toolBrush" title="Кисть (1) — крась по коту, за края не выйдет">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
           </button>
-          <button type="button" class="tbtn" id="toolEraser" title="Ластик (2) — стирает твою краску, кот остаётся">
+          <button type="button" class="tbtn" id="toolEraser" title="Ластик (2) — стирает твою краску, кот и контур остаются">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8.5l-5.2-5.2a1.5 1.5 0 0 1 0-2.1l9.4-9.4a1.5 1.5 0 0 1 2.1 0l4.9 4.9a1.5 1.5 0 0 1 0 2.1L13 19"/><path d="M9.4 8.6l6 6"/></svg>
           </button>
-          <button type="button" class="tbtn" id="toolFill" title="Заливка (3) — заливает одинаковую область, останавливается на другой краске или линии">
+          <button type="button" class="tbtn" id="toolFill" title="Заливка (3) — заливает схожую область, останавливается на контуре">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11L12.3 4.3a1 1 0 0 0-1.4 0l-8 8a1 1 0 0 0 0 1.4l5.6 5.6c.4.4 1 .4 1.4 0l8.1-8.1a1 1 0 0 0 0-1.3z"/><path d="M4.5 13.5l6-6"/><path d="M20.5 16.5c0 1.4-1.1 2.5-2.3 2.5s-2.2-1.1-2.2-2.5c0-1 1.3-2.8 2.2-4 1 1.2 2.3 3 2.3 4z" fill="currentColor" stroke="none"/></svg>
           </button>
           <button type="button" class="tbtn" id="toolPicker" title="Пипетка (4) — взять цвет с картинки">
@@ -156,11 +168,34 @@
 
       <div class="section">
         <div class="cap">Кисть</div>
+        <div class="brow">
+          <button type="button" class="bbtn active" id="brushRound" title="Круглая — мягкость края зависит от «жёсткости»">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="5.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.6" opacity=".4" stroke-width="2.4"/></svg>
+            <span>круглая</span>
+          </button>
+          <button type="button" class="bbtn" id="brushFlat" title="Плоская — след поворачивается за движением">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M12 12l7.8-4.6" stroke-width="6" opacity=".9"/><path d="M12 12l-7.8 4.6" stroke-width="2.2" opacity=".45"/></svg>
+            <span>плоская</span>
+          </button>
+          <button type="button" class="bbtn" id="brushPencil" title="Карандаш — тонкий зернистый след">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5l5 5L8 21H4v-4L14.5 4.5z"/><path d="M12.5 6.5l5 5"/></svg>
+            <span>карандаш</span>
+          </button>
+          <button type="button" class="bbtn" id="brushSpray" title="Спрей — распылённые точки">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="9" r="1.7"/><circle cx="15" cy="11" r="1.7"/><circle cx="11" cy="15" r="1.7"/><circle cx="7" cy="14" r="1.4"/><circle cx="14" cy="6" r="1.4"/><circle cx="17" cy="15.5" r="1.1"/><circle cx="10" cy="19" r="1.1"/></svg>
+            <span>спрей</span>
+          </button>
+        </div>
         <div class="sizes">
           <button type="button" class="sbtn" data-sz="3"><i class="d3"></i></button>
           <button type="button" class="sbtn active" data-sz="6"><i class="d6"></i></button>
           <button type="button" class="sbtn" data-sz="12"><i class="d12"></i></button>
           <button type="button" class="sbtn" data-sz="22"><i class="d22"></i></button>
+        </div>
+        <div class="oprow">
+          <span class="cap">Жёсткость</span>
+          <input type="range" id="hardness" min="0" max="100" step="5" value="70">
+          <span class="val" id="hardnessVal">70%</span>
         </div>
         <div class="oprow">
           <span class="cap">Прозрачность</span>
@@ -219,13 +254,16 @@
 (function () {
 'use strict';
 /* ============================================================
-   KNS Paint v4 — «как в Paint»: свободная гладкая кисть поверх
-   оригинального скетча. Никаких зон, контуров и клипов:
-   краска ложится куда ткнули, игрок сам рисует контуры.
-   Полупрозрачность равномерная: живой мазок = ПУТЬ, каждый кадр
-   рисуется целиком одним stroke() в буфер мазка (одна операция
-   на кадр — нет накопления плотности в перекрытиях), по
-   завершении буфер переносится в paintCv с итоговой alpha.
+   KNS Paint v5 — кисть по коту с контрактом:
+   1) краска не выходит за силуэт кота (клип по альфе скетча);
+   2) контур кота (тёмные линии скетча) всегда ПОВЕРХ краски;
+   3) кисти: круглая / плоская / карандаш / спрей +
+      слайдер жёсткости (чёткости края);
+   4) ластик стирает краску (живой мазок ластика = маска
+      вычитания, а сама база и контур не трогаются).
+   Живой мазок = ПУТЬ штампов; каждый px штампуется один раз
+   за кадр с MAX-альфой (нет накопления плотности), цвет
+   переносится одной операцией с итоговой прозрачностью.
    ============================================================ */
 
 var D = window.PAINT_DATA || (typeof PAINT_DATA !== 'undefined' ? PAINT_DATA : null);
@@ -272,7 +310,9 @@ function hsv2rgb(h, s, v) {
 /* ---------- состояние ---------- */
 var state = {
   tool: 'brush',          /* brush | eraser | fill | picker */
+  brush: 'round',         /* round | flat | pencil | spray */
   size: 6,                /* диаметр кисти, арт-px */
+  hardness: 70,           /* 0 мягкая кромка .. 100 резкая */
   opacity: 100,
   color: '#f5e5ce',
   prevColor: '#828a8f'
@@ -281,8 +321,8 @@ var history = [];
 var HIST_MAX = 18;
 
 /* ---------- канвасы ---------- */
-var baseCv = mkCv(), paintCv = mkCv(), liveCv = mkCv();
-var bctx = ctx2d(baseCv), pctx = ctx2d(paintCv), lctx = ctx2d(liveCv);
+var baseCv = mkCv(), paintCv = mkCv(), liveCv = mkCv(), lineCv = mkCv(), tmpCv = mkCv();
+var bctx = ctx2d(baseCv), pctx = ctx2d(paintCv), lctx = ctx2d(liveCv), linectx = ctx2d(lineCv), tctx = ctx2d(tmpCv);
 var work = $('work'), wctx = ctx2d(work);
 
 /* ---------- ассеты ---------- */
@@ -293,22 +333,53 @@ var baseImageData = null, silArr = null, darkArr = null;
 function buildBase() {
   bctx.drawImage(assets.base, 0, 0, W, H);
   baseImageData = bctx.getImageData(0, 0, W, H);
-  /* маски нужны ТОЛЬКО selftest-проверкам; движок рисования их не использует */
   var n = W * H, bd = baseImageData.data;
   silArr = new Uint8Array(n); darkArr = new Uint8Array(n);
+  /* lineCv — контур (тёмные линии скетча), рисуется ПОВЕРХ краски в композите */
+  var li = linectx.createImageData(W, H), ld = li.data;
   for (var i = 0; i < n; i++) {
     var o = i * 4;
     if (bd[o + 3] > 0) silArr[i] = 1;
-    if (bd[o + 3] > 200 && (bd[o] + bd[o + 1] + bd[o + 2]) / 3 < 90) darkArr[i] = 1;
+    var avg = (bd[o] + bd[o + 1] + bd[o + 2]) / 3;
+    if (bd[o + 3] > 200 && avg < 90) darkArr[i] = 1;
+    if (darkArr[i]) {
+      ld[o] = bd[o]; ld[o + 1] = bd[o + 1]; ld[o + 2] = bd[o + 2]; ld[o + 3] = bd[o + 3];
+    }
   }
+  linectx.putImageData(li, 0, 0);
 }
 
-/* ---------- композит: скетч + краска, БЕЗ клипа ---------- */
+/* ---------- композит: скетч → краска (клипнута) → контур поверх ---------- */
+function paintLayer() {
+  if (liveStroke && liveStroke.erase) {
+    /* живой ластик: краска минус маска стирации */
+    tctx.globalCompositeOperation = 'source-over';
+    tctx.clearRect(0, 0, W, H);
+    tctx.drawImage(paintCv, 0, 0);
+    tctx.globalCompositeOperation = 'destination-out';
+    tctx.globalAlpha = liveStroke.alpha;
+    tctx.drawImage(liveCv, 0, 0);
+    tctx.globalAlpha = 1;
+    tctx.globalCompositeOperation = 'source-over';
+    return tmpCv;
+  }
+  return paintCv;
+}
 function composite() {
   wctx.clearRect(0, 0, W, H);
   wctx.drawImage(baseCv, 0, 0);
-  wctx.drawImage(paintCv, 0, 0);
-  if (liveStroke) wctx.drawImage(liveCv, 0, 0);
+  var pl = paintLayer();
+  if (pl !== paintCv) {
+    wctx.drawImage(pl, 0, 0);
+  } else {
+    wctx.drawImage(paintCv, 0, 0);
+    if (liveStroke) {
+      wctx.globalAlpha = liveStroke.alpha;
+      wctx.drawImage(liveCv, 0, 0);
+      wctx.globalAlpha = 1;
+    }
+  }
+  wctx.drawImage(lineCv, 0, 0);   /* контур всегда поверх */
 }
 
 /* ---------- undo/redo ---------- */
@@ -344,42 +415,159 @@ function clearPaint() {
   composite(); schedulePersist();
 }
 
-/* ---------- живой мазок: путь, перерисовка целиком ---------- */
-var liveStroke = null; /* { pts:[{x,y}], erase, color, alpha, width } */
-function redrawLive() {
-  lctx.clearRect(0, 0, W, H);
-  if (!liveStroke || !liveStroke.pts.length) return;
-  var o = liveStroke;
-  if (o.erase) { lctx.globalCompositeOperation = 'destination-out'; lctx.strokeStyle = '#000'; lctx.fillStyle = '#000'; }
-  else { lctx.globalCompositeOperation = 'source-over'; lctx.strokeStyle = o.color; lctx.fillStyle = o.color; }
-  lctx.globalAlpha = o.alpha;
-  lctx.lineWidth = o.width;
-  lctx.lineJoin = 'round';
-  lctx.lineCap = 'round';
-  var pts = o.pts;
-  if (pts.length === 1) {
-    var r = Math.max(o.width / 2, 0.6);
-    lctx.beginPath();
-    lctx.arc(pts[0].x, pts[0].y, r, 0, Math.PI * 2);
-    lctx.fill();
-  } else {
-    lctx.beginPath();
-    lctx.moveTo(pts[0].x, pts[0].y);
-    for (var i = 1; i < pts.length; i++) lctx.lineTo(pts[i].x, pts[i].y);
-    lctx.stroke();
-  }
-  lctx.globalAlpha = 1;
-  lctx.globalCompositeOperation = 'source-over';
+/* ---------- штампы: px-перечисление с MAX-альфой ---------- */
+function profA(t, hard01) {
+  /* профиль края: t∈[0..1]; внутри ядра (t<=hr) — 255, дальше линейный спад */
+  var hr = Math.min(hard01, 0.98);
+  if (t <= hr) return 255;
+  var a = 255 * (1 - t) / (1 - hr + 0.02);
+  return a > 255 ? 255 : a;
 }
-function liveBegin(x, y) {
-  pushUndo();
-  liveStroke = {
-    pts: [{ x: x, y: y }],
+function frac(x) { return x - Math.floor(x); }
+function hashF(seed, salt) {
+  var v = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
+  return frac(Math.abs(v));
+}
+
+/* круглый штамп: r — радиус, hard — жёсткость 0..1 */
+function stampRound(uA, x, y, r, hard) {
+  var x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(W - 1, Math.ceil(x + r));
+  var y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(H - 1, Math.ceil(y + r));
+  var r2 = r * r, stepI = 1 / r;
+  for (var py = y0; py <= y1; py++) {
+    var rowW = py * W;
+    for (var px = x0; px <= x1; px++) {
+      var dx = px - x, dy = py - y, d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      var i = rowW + px;
+      if (!silArr[i]) continue;              /* КЛИП по силуэту кота */
+      var t = Math.sqrt(d2) * stepI;
+      var a = profA(t, hard);
+      if (a > uA[i]) uA[i] = a;
+    }
+  }
+}
+/* плоский штамп-эллипс вдоль ang (направление движения в радианах) */
+function stampFlat(uA, x, y, r, hard, ang) {
+  var rb = Math.max(0.8, r * 0.42);           /* малая полуось */
+  var x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(W - 1, Math.ceil(x + r));
+  var y0 = Math.max(0, Math.floor(y - rb)), y1 = Math.min(H - 1, Math.ceil(y + rb));
+  var ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var py = y0; py <= y1; py++) {
+    var rowW = py * W;
+    for (var px = x0; px <= x1; px++) {
+      var i = rowW + px;
+      if (!silArr[i]) continue;
+      var dx = px - x, dy = py - y;
+      var along = dx * ca + dy * sa;           /* вдоль мазка */
+      var across = -dx * sa + dy * ca;         /* поперёк */
+      var t = Math.max(Math.abs(along) / r, Math.abs(across) / rb);
+      if (t > 1) continue;
+      var a = profA(t, hard);
+      if (a > uA[i]) uA[i] = a;
+    }
+  }
+}
+/* карандаш: тонкое твёрдое ядро с зернистостью (джиттер детерминирован) */
+function stampPencil(uA, x, y, r, seed) {
+  var re = Math.max(0.7, r * 0.32);
+  var jx = (hashF(seed, 1) - 0.5) * re * 1.2;
+  var jy = (hashF(seed, 2) - 0.5) * re * 1.2;
+  var cx = x + jx, cy = y + jy;
+  var x0 = Math.max(0, Math.floor(cx - re)), x1 = Math.min(W - 1, Math.ceil(cx + re));
+  var y0 = Math.max(0, Math.floor(cy - re)), y1 = Math.min(H - 1, Math.ceil(cy + re));
+  var r2 = re * re;
+  for (var py = y0; py <= y1; py++) {
+    var rowW = py * W;
+    for (var px = x0; px <= x1; px++) {
+      var dx = px - cx, dy = py - cy, d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      var i = rowW + px;
+      if (!silArr[i]) continue;
+      var t = Math.sqrt(d2) / re;
+      var a = profA(Math.min(1, t * 0.9), 0.85);  /* почти резкое ядро */
+      if (a > uA[i]) uA[i] = a;
+    }
+  }
+}
+/* спрей: распылённые точки по кругу; плотность растёт от seed-ошумления */
+function stampSpray(uA, x, y, r, seed) {
+  var n = Math.max(3, Math.round(r * r * 0.28));
+  for (var k = 0; k < n; k++) {
+    var ang = hashF(seed + k, 3) * Math.PI * 2;
+    var dist = Math.sqrt(hashF(seed + k, 4)) * r * 0.98;
+    var sx = Math.round(x + Math.cos(ang) * dist);
+    var sy = Math.round(y + Math.sin(ang) * dist);
+    if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue;
+    var i = sy * W + sx;
+    if (!silArr[i]) continue;
+    if (uA[i] < 170) uA[i] = 255;
+  }
+}
+
+/* ---------- живой мазок: путь штампов, per-px MAX-альфа ---------- */
+var liveStroke = null;   /* { pts, erase, color, alpha, radius, hard, brush } */
+var uA = new Uint8Array(W * H);
+var liveImg = null;
+
+function redrawLive() {
+  if (!liveImg) liveImg = lctx.createImageData(W, H);
+  var dd = liveImg.data;
+  dd.fill(0);
+  if (!liveStroke || !liveStroke.pts.length) { lctx.clearRect(0, 0, W, H); return; }
+  uA.fill(0);
+  var o = liveStroke;
+  var pts = o.pts;
+  var seed0 = pts.length * 7 + 13;
+  if (pts.length === 1) {
+    placeStamp(pts[0].x, pts[0].y, 0, o, seed0);
+  } else {
+    var seedI = 0;
+    for (var k = 1; k < pts.length; k++) {
+      var pA = pts[k - 1], pB = pts[k];
+      var dx = pB.x - pA.x, dy = pB.y - pA.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var step = Math.max(0.4, o.radius * 0.30);
+      var steps = Math.max(1, Math.ceil(dist / step));
+      for (var s = 1; s <= steps; s++) {
+        placeStamp(pA.x + dx * s / steps, pA.y + dy * s / steps,
+          Math.atan2(dy, dx), o, seed0 + seedI);
+        seedI++;
+      }
+    }
+  }
+  /* собрать ImageData: цвет + per-px альфа штампов */
+  var col = hexRGB(o.erase ? '#000000' : o.color) || { r: 255, g: 0, b: 255 };
+  for (var i = 0, p = 0; i < W * H; i++, p += 4) {
+    var a = uA[i];
+    if (!a) continue;
+    dd[p] = col.r; dd[p + 1] = col.g; dd[p + 2] = col.b; dd[p + 3] = a;
+  }
+  lctx.putImageData(liveImg, 0, 0);
+}
+function placeStamp(x, y, ang, o, seed) {
+  var r = o.radius, hard = o.hard;
+  if (o.brush === 'pencil') stampPencil(uA, x, y, r, seed);
+  else if (o.brush === 'spray') stampSpray(uA, x, y, r, seed);
+  else if (o.brush === 'flat') stampFlat(uA, x, y, r, hard, ang);
+  else stampRound(uA, x, y, r, hard);
+}
+function liveStampParams() {
+  return {
     erase: state.tool === 'eraser',
     color: state.color,
     alpha: state.opacity / 100,
-    width: state.size
+    radius: Math.max(1, state.size / 2),
+    hard: state.hardness / 100,
+    brush: state.tool === 'eraser' && state.brush === 'flat' ? 'round' : state.brush
   };
+}
+function liveBegin(x, y) {
+  pushUndo();
+  liveStroke = { pts: [{ x: x, y: y }] };
+  var p = liveStroke;
+  var lp = liveStrokeParams();
+  for (var kk in lp) p[kk] = lp[kk];
   redrawLive();
   composite();
 }
@@ -388,14 +576,14 @@ function liveMove(x, y) {
   var last = liveStroke.pts[liveStroke.pts.length - 1];
   if (Math.abs(x - last.x) + Math.abs(y - last.y) < 0.35) return;
   liveStroke.pts.push({ x: x, y: y });
-  redrawLive();   /* весь путь одним stroke — равномерная прозрачность */
+  redrawLive();
   composite();
 }
 function liveEnd() {
   if (!liveStroke) { schedulePersist(); return; }
   redrawLive();
   pctx.globalCompositeOperation = liveStroke.erase ? 'destination-out' : 'source-over';
-  pctx.globalAlpha = 1; /* alpha уже вшита в пиксели liveCv (redrawLive), повторно не ослабляем */
+  pctx.globalAlpha = liveStroke.alpha;
   pctx.drawImage(liveCv, 0, 0);
   pctx.globalAlpha = 1;
   pctx.globalCompositeOperation = 'source-over';
@@ -403,23 +591,36 @@ function liveEnd() {
   liveStroke = null;
   composite(); schedulePersist();
 }
+function liveStrokeParams() {
+  return {
+    erase: state.tool === 'eraser',
+    color: state.color,
+    alpha: state.opacity / 100,
+    radius: Math.max(1, state.size / 2),
+    hard: state.hardness / 100,
+    brush: (state.tool === 'eraser') ? 'round' : state.brush
+  };
+}
 /* программный мазок для тестов/зондов: путь (x0,y0)->(x1,y1) */
 function strokeLine(x0, y0, x1, y1, uo) {
   var o = {
     erase: uo && uo.erase === true,
     color: (uo && uo.color) || state.color,
     alpha: ((uo && uo.opacity) != null ? uo.opacity : state.opacity) / 100,
-    width: (uo && uo.size) || state.size
+    radius: Math.max(1, ((uo && uo.size) || state.size) / 2),
+    hard: ((uo && uo.hardness) != null ? uo.hardness : state.hardness) / 100,
+    brush: (uo && uo.brush) || state.brush
   };
   pushUndo();
-  liveStroke = { pts: [{ x: x0, y: y0 }], erase: o.erase, color: o.color, alpha: o.alpha, width: o.width };
+  liveStroke = { pts: [{ x: x0, y: y0 }] };
+  for (var kk in o) liveStroke[kk] = o[kk];
   var dx = x1 - x0, dy = y1 - y0, dist = Math.sqrt(dx * dx + dy * dy);
   var steps = Math.max(1, Math.ceil(dist * 2));
   for (var t = 1; t <= steps; t++)
     liveStroke.pts.push({ x: x0 + dx * t / steps, y: y0 + dy * t / steps });
   redrawLive();
   pctx.globalCompositeOperation = o.erase ? 'destination-out' : 'source-over';
-  pctx.globalAlpha = 1; /* alpha уже в пикселях liveCv */
+  pctx.globalAlpha = o.alpha;
   pctx.drawImage(liveCv, 0, 0);
   pctx.globalAlpha = 1;
   pctx.globalCompositeOperation = 'source-over';
@@ -428,7 +629,7 @@ function strokeLine(x0, y0, x1, y1, uo) {
   composite(); schedulePersist();
 }
 
-/* ---------- заливка: похожесть на ВИДИМОЙ картинке ---------- */
+/* ---------- заливка: похожесть на ВИДИМОЙ картинке + клип по коту ---------- */
 var FILL_TOL = 38;
 function pxLike(d, o4i, o4j) {
   return Math.abs(d[o4i] - d[o4j]) <= FILL_TOL &&
@@ -438,9 +639,10 @@ function pxLike(d, o4i, o4j) {
 }
 function floodFillAt(ax, ay, uo) {
   if (ax < 0 || ay < 0 || ax >= W || ay >= H) return 0;
+  var start = ay * W + ax;
+  if (!silArr[start]) return 0;             /* старт только внутри кота */
   composite();
   var vis = wctx.getImageData(0, 0, W, H), vd = vis.data;
-  var start = ay * W + ax;
   var visited = new Uint8Array(W * H), stack = [start], region = [];
   visited[start] = 1;
   while (stack.length) {
@@ -461,6 +663,7 @@ function floodFillAt(ax, ay, uo) {
   var fillCv = mkCv(), fctx = ctx2d(fillCv);
   var img = fctx.createImageData(W, H), idd = img.data;
   for (var k = 0; k < region.length; k++) {
+    if (!silArr[region[k]]) continue;
     var p = region[k] * 4;
     idd[p] = c.r; idd[p + 1] = c.g; idd[p + 2] = c.b; idd[p + 3] = 255;
   }
@@ -492,6 +695,7 @@ function persistNow() {
     localStorage.setItem(KEY, JSON.stringify({
       p: paintCv.toDataURL('image/png'),
       color: state.color, size: state.size, opacity: state.opacity,
+      brush: state.brush, hardness: state.hardness,
       history: history.slice(0, HIST_MAX)
     }));
   } catch (e) { }
@@ -503,6 +707,13 @@ function tryRestore() {
     var o = JSON.parse(raw);
     if (o && typeof o.color === 'string') setColor(o.color, true);
     if (o && typeof o.size === 'number' && [3, 6, 12, 22].indexOf(o.size) >= 0) setSize(o.size);
+    if (o && typeof o.hardness === 'number' && o.hardness >= 0 && o.hardness <= 100) {
+      state.hardness = Math.round(o.hardness / 5) * 5;
+      $('hardness').value = state.hardness;
+      $('hardnessVal').textContent = state.hardness + '%';
+    }
+    if (o && typeof o.brush === 'string' &&
+        ['round', 'flat', 'pencil', 'spray'].indexOf(o.brush) >= 0) setBrush(o.brush);
     if (o && typeof o.opacity === 'number' && o.opacity >= 5 && o.opacity <= 100) {
       state.opacity = Math.round(o.opacity / 5) * 5;
       $('opacity').value = state.opacity;
@@ -516,7 +727,17 @@ function tryRestore() {
     }
     if (o && typeof o.p === 'string' && o.p.indexOf('data:image') === 0) {
       var img = new Image();
-      img.onload = function () { pctx.clearRect(0, 0, W, H); pctx.drawImage(img, 0, 0); composite(); };
+      img.onload = function () {
+        /* старая/чужая краска клипнется по силуэту кота при загрузке */
+        var t = mkCv(), tctx = ctx2d(t);
+        tctx.drawImage(img, 0, 0);
+        tctx.globalCompositeOperation = 'destination-in';
+        tctx.drawImage(baseCv, 0, 0);
+        tctx.globalCompositeOperation = 'source-over';
+        pctx.clearRect(0, 0, W, H);
+        pctx.drawImage(t, 0, 0);
+        composite();
+      };
       img.onerror = function () { };
       img.src = o.p;
     }
@@ -534,6 +755,11 @@ function setSize(s) {
   var btns = document.querySelectorAll('.sbtn');
   for (var j = 0; j < btns.length; j++)
     btns[j].classList.toggle('active', parseInt(btns[j].getAttribute('data-sz'), 10) === s);
+}
+function setBrush(b) {
+  state.brush = b;
+  var map = { round: 'brushRound', flat: 'brushFlat', pencil: 'brushPencil', spray: 'brushSpray' };
+  for (var k in map) $(map[k]).classList.toggle('active', k === b);
 }
 function pushHistoryRaw(hex) {
   if (history[0] === hex) return;
@@ -688,12 +914,21 @@ $('toolBrush').onclick = function () { setTool('brush'); };
 $('toolEraser').onclick = function () { setTool('eraser'); };
 $('toolFill').onclick = function () { setTool('fill'); };
 $('toolPicker').onclick = function () { setTool('picker'); };
+$('brushRound').onclick = function () { setBrush('round'); schedulePersist(); };
+$('brushFlat').onclick = function () { setBrush('flat'); schedulePersist(); };
+$('brushPencil').onclick = function () { setBrush('pencil'); schedulePersist(); };
+$('brushSpray').onclick = function () { setBrush('spray'); schedulePersist(); };
 var szBtns = document.querySelectorAll('.sbtn');
 for (var szi = 0; szi < szBtns.length; szi++) {
   (function (b) {
     b.onclick = function () { setSize(parseInt(b.getAttribute('data-sz'), 10)); schedulePersist(); };
   })(szBtns[szi]);
 }
+$('hardness').addEventListener('input', function () {
+  state.hardness = parseInt(this.value, 10);
+  $('hardnessVal').textContent = state.hardness + '%';
+  schedulePersist();
+});
 $('opacity').addEventListener('input', function () {
   state.opacity = parseInt(this.value, 10);
   $('opacityVal').textContent = state.opacity + '%';
@@ -736,6 +971,7 @@ $('btnExpPaint').onclick = function () { download(paintCv, 'kns-paint-layer.png'
    ============================================================ */
 var SELFTESTS = window.__PAINT_TEST = {};
 function snapWork() { return wctx.getImageData(0, 0, W, H); }
+function snapPaint() { return pctx.getImageData(0, 0, W, H); }
 function dataEqual(a, b) {
   if (a.width !== b.width || a.height !== b.height) return false;
   var x = a.data, y = b.data;
@@ -746,6 +982,21 @@ function diffPx(A, B, i) {
   var a = A.data, b = B.data, o = i * 4;
   return Math.abs(a[o] - b[o]) + Math.abs(a[o + 1] - b[o + 1]) +
     Math.abs(a[o + 2] - b[o + 2]) + Math.abs(a[o + 3] - b[o + 3]);
+}
+function lightBodyPoint() {
+  /* светлый px тела внутри зоны заливки (для проб мазков) */
+  var ox = 152, oy = 100;
+  var d = baseImageData.data;
+  for (var y = 100; y < 145; y++) {
+    for (var x = 140; x < 175; x++) {
+      var i = y * W + x, o = i * 4;
+      if (d[o + 3] > 200) {
+        var avg = (d[o] + d[o + 1] + d[o + 2]) / 3;
+        if (avg > 115) return { x: x, y: y };
+      }
+    }
+  }
+  return { x: ox, y: oy };
 }
 function runSelfTest() {
   var lines = [], pass = 0, total = 0;
@@ -763,19 +1014,21 @@ function runSelfTest() {
 
   rec('ST1', assets.base.complete && assets.base.naturalWidth === W, 'скетч ' + W + '×' + H);
 
-  /* ST2: СВОБОДНАЯ кисть красит и ВНЕ кота (клипа нет) + undo */
+  var BODY = lightBodyPoint();
+
+  /* ST2: КЛИП — мазок в воздухе НЕ красит */
   A = snapWork();
-  strokeLine(8, 8, 8, 120, { size: 6, color: '#00ccff', opacity: 100 });
+  strokeLine(8, 4, 8, 100, { size: 6, color: '#00ccff', opacity: 100 });
   B = snapWork();
   var air = 0;
-  for (var i2 = 0; i2 < W * H; i2++) if (diffPx(A, B, i2) > 0 && !silArr[i2]) air++;
+  for (var i2 = 0; i2 < W * H; i2++) if (diffPx(A, B, i2) > 0) air++;
   var undoOk2 = doUndo() && dataEqual(snapWork(), A);
-  rec('ST2', air > 150 && undoOk2, 'мазок мимо кота: ' + air + ' px закрашено в воздухе, undo байт-в-байт: ' + undoOk2);
+  rec('ST2', air === 0 && undoOk2, 'клип по коту: следов вне кота ' + air + ' px (жду 0), undo: ' + undoOk2);
 
-  /* ST3: полупрозрачный мазок = лерп база→цвет по alpha */
-  strokeLine(60, 62, 68, 62, { size: 3, color: '#6fa8ff', opacity: 50 });
+  /* ST3: полупрозрачный жёсткий мазок = лерп base→цвет */
+  strokeLine(BODY.x, BODY.y, BODY.x + 8, BODY.y, { size: 4, hardness: 100, color: '#6fa8ff', opacity: 50 });
   B = snapWork();
-  var o3 = (62 * W + 64) * 4;
+  var o3 = (BODY.y * W + BODY.x + 4) * 4;
   var ex3 = {
     r: A.data[o3] * 0.5 + 111 * 0.5,
     g: A.data[o3 + 1] * 0.5 + 168 * 0.5,
@@ -785,53 +1038,122 @@ function runSelfTest() {
     Math.abs(B.data[o3 + 1] - ex3.g) <= 6 &&
     Math.abs(B.data[o3 + 2] - ex3.b) <= 6;
   var undoOk3 = doUndo() && dataEqual(snapWork(), A);
-  rec('ST3', ok3 && undoOk3, 'мазок 50%: px≈лерп(base,цвет)±6 — ' + ok3 + '; undo: ' + undoOk3);
+  rec('ST3', ok3 && undoOk3, 'мазок 50% в теле: px≈лерп(base,цвет)±6 — ' + ok3 + '; undo: ' + undoOk3);
 
-  /* ST4: заливка similarity — светлое тело заливается, тёмный контур и глаз НЕ заливаются */
+  /* ST4: заливка — светлое тело заливается, воздух/контур/глаз не заливаются */
   A = snapWork();
   var n4 = floodFillAt(152, 100, { color: '#00aa00', opacity: 100 });
   B = snapWork();
-  var fillCnt = 0;
-  for (var i4 = 0; i4 < W * H; i4++) if (diffPx(A, B, i4) > 0) fillCnt++;
+  var fillCnt = 0, fillAir = 0;
+  for (var i4 = 0; i4 < W * H; i4++) {
+    if (diffPx(A, B, i4) > 0) { fillCnt++; if (!silArr[i4]) fillAir++; }
+  }
   var eyeO = (45 * W + 34) * 4;
   var eyeGreen = B.data[eyeO] < 100 && B.data[eyeO + 1] > 120 && B.data[eyeO + 2] < 100;
+  var nAir = floodFillAt(3, 190, { color: '#00aa00', opacity: 100 });
   var undoOk4 = doUndo() && dataEqual(snapWork(), A);
-  rec('ST4', n4 > 9000 && n4 === fillCnt && !eyeGreen && undoOk4,
-    'заливка тела (152,100): ' + n4 + 'px; глаз НЕ тронут: ' + !eyeGreen + '; undo: ' + undoOk4);
+  rec('ST4', n4 > 9000 && n4 >= fillCnt - 2 && fillAir === 0 && !eyeGreen && nAir === 0 && undoOk4,
+    'заливка тела: ' + n4 + 'px, вне кота: ' + fillAir + ', старт-в-воздухе: ' + nAir + ' (жду 0), глаз НЕ тронут: ' + !eyeGreen + '; undo: ' + undoOk4);
 
-  /* ST5: глаза красятся кистью поверх (никаких барьеров) */
-  A = snapWork();
-  strokeLine(33, 44, 40, 48, { size: 6, color: '#ff00d0', opacity: 100 });
+  /* ST5: КОНТУР ПОВЕРХ — краска не перекрывает тёмную линию */
+  var linePx = -1;
+  for (var i5 = (60 * W); i5 < W * H; i5++) {
+    if (darkArr[i5]) { var x5 = i5 % W, y5 = (i5 - x5) / W; if (x5 > 60 && x5 < 230 && y5 > 50) { linePx = i5; break; } }
+  }
+  var ok5 = false, det5 = 'тёмная линия не найдена';
+  if (linePx >= 0) {
+    var lx = linePx % W, ly = ((linePx - (linePx % W)) / W);
+    A = snapWork();
+    strokeLine(lx, ly - 6, lx, ly + 6, { size: 12, color: '#ff00d0', opacity: 100 });
+    B = snapWork();
+    var o5 = (ly * W + lx) * 4;
+    var dr = Math.abs(B.data[o5] - A.data[o5]) + Math.abs(B.data[o5 + 1] - A.data[o5 + 1]) +
+             Math.abs(B.data[o5 + 2] - A.data[o5 + 2]);
+    ok5 = dr < 25;
+    var undoOk5 = doUndo() && dataEqual(snapWork(), A);
+    ok5 = ok5 && undoOk5;
+    det5 = 'мазок по линии (' + lx + ',' + ly + '): дифф ' + dr + ' <25 — контур поверх; undo: ' + undoOk5;
+  }
+  rec('ST5', ok5, det5);
+
+  /* ST6: ЛАСТИК — красит и стирает обратно в базу */
+  strokeLine(BODY.x, BODY.y, BODY.x + 10, BODY.y, { size: 8, hardness: 100, color: '#ff3366', opacity: 100 });
+  var painted6 = false;
   B = snapWork();
-  var o5 = (45 * W + 36) * 4;
-  var eyeOk = Math.abs(B.data[o5] - 255) < 12 && Math.abs(B.data[o5 + 1]) < 12 &&
-              Math.abs(B.data[o5 + 2] - 208) < 15;
-  var undoOk5 = doUndo() && dataEqual(snapWork(), A);
-  rec('ST5', eyeOk && undoOk5, 'мазок по зрачку: px≈#ff00d0 — ' + eyeOk + '; undo: ' + undoOk5);
+  {
+    var o6 = (BODY.y * W + BODY.x + 4) * 4;
+    painted6 = Math.abs(B.data[o6] - 255) < 20 && Math.abs(B.data[o6 + 1] - 51) < 20 && Math.abs(B.data[o6 + 2] - 102) < 20;
+  }
+  strokeLine(BODY.x, BODY.y, BODY.x + 10, BODY.y, { erase: true, size: 8, hardness: 100, opacity: 100 });
+  var erased6 = dataEqual(snapWork(), A);
+  var undoOk6 = doUndo() && doUndo() && dataEqual(snapWork(), A);
+  rec('ST6', painted6 && erased6 && undoOk6,
+    'ластик: краска легла ' + painted6 + ', стёрта в базу ' + erased6 + ', undo x2: ' + undoOk6);
 
-  /* ST6: история цветов */
+  /* ST7: ЖЁСТКОСТЬ — мягкая кромка vs резкая (альфа по краю в paintCv) */
+  state.size = 22;
+  strokeLine(BODY.x, BODY.y, BODY.x, BODY.y, { size: 22, hardness: 0, color: '#6fa8ff', opacity: 100 });
+  var psoft = snapPaint();
+  doUndo();
+  strokeLine(BODY.x, BODY.y, BODY.x, BODY.y, { size: 22, hardness: 100, color: '#6fa8ff', opacity: 100 });
+  var phard = snapPaint();
+  doUndo();
+  state.size = 6; setSize(6);
+  var ci = (BODY.y * W + BODY.x) * 4;
+  /* пробная точка на краю: центр + 9.5px по x (r=11) */
+  var eo = (BODY.y * W + Math.min(W - 1, BODY.x + 10)) * 4;
+  var softEdge = psoft.data[eo + 3];
+  var hardEdge = phard.data[eo + 3];
+  var coreOk = phard.data[ci + 3] > 240 && psoft.data[ci + 3] > 200;
+  var edgeOk = softEdge < hardEdge - 40;
+  rec('ST7', edgeOk && coreOk,
+    'жёсткость: край мягкой ' + softEdge + ' < резкой ' + hardEdge + ' (euillez -40), ядро G/B ' + phard.data[ci + 3] + '/' + psoft.data[ci + 3]);
+
+  /* ST8: ТИПЫ КИСТЕЙ — карандаш тоньше круглой, спрей пятнистый */
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y, { brush: 'pencil', size: 12, color: '#6fa8ff', opacity: 100 });
+  var penP = snapPaint(); doUndo();
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y, { brush: 'round', size: 12, hardness: 100, color: '#6fa8ff', opacity: 100 });
+  var rndP = snapPaint(); doUndo();
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y, { brush: 'spray', size: 12, color: '#6fa8ff', opacity: 100 });
+  var sprP = snapPaint(); doUndo();
+  function countOnCol(img, xx) {
+    var c = 0;
+    for (var yy = Math.max(0, BODY.y - 10); yy < Math.min(H, BODY.y + 11); yy++) {
+      var o = (yy * W + xx) * 4;
+      if (img.data[o + 3] > 30) c++;
+    }
+    return c;
+  }
+  var mx = Math.min(W - 1, BODY.x + 7);
+  var penH = countOnCol(penP, mx), rndH = countOnCol(rndP, mx), sprH = countOnCol(sprP, mx);
+  var ok8 = penH < rndH - 3 && sprH < rndH && sprH > 0;
+  rec('ST8', ok8,
+    'типы (толщина поперёк): карандаш ' + penH + ' px < круглая ' + rndH + '; спрей ' + sprH + ' (пятнистый, < круглой и >0)');
+
+  /* ST9: история цветов */
   var hBefore = history.length;
   setColor('#123456');
   setColor('#123456');
   setColor('#abcdef');
   var dup = history.indexOf('#123456') !== history.lastIndexOf('#123456');
-  var ok6 = history.indexOf('#123456') >= 0 && history[0] === '#abcdef' && !dup;
-  rec('ST6', ok6, 'история: +' + (history.length - hBefore) + ', без дублей, top #abcdef');
+  var ok9 = history.indexOf('#123456') >= 0 && history[0] === '#abcdef' && !dup;
+  rec('ST9', ok9, 'история: +' + (history.length - hBefore) + ', без дублей, top #abcdef');
   setColor('#f5e5ce');
 
-  /* ST7: экспорт */
+  /* ST10: экспорт */
   var url = work.toDataURL('image/png');
-  rec('ST7', url.indexOf('data:image/png') === 0 && url.length > 2000, 'PNG dataURL ' + url.length + ' симв.');
+  rec('ST10', url.indexOf('data:image/png') === 0 && url.length > 2000, 'PNG dataURL ' + url.length + ' симв.');
 
-  /* ST8: persist */
+  /* ST11: persist */
   persistNow();
-  var ok8 = false, len8 = 0;
+  var ok11 = false, len11 = 0;
   try {
-    var raw8 = localStorage.getItem(KEY);
-    var o8 = raw8 ? JSON.parse(raw8) : null;
-    if (o8 && typeof o8.p === 'string' && o8.p.indexOf('data:image/png') === 0) { ok8 = true; len8 = o8.p.length; }
+    var raw11 = localStorage.getItem(KEY);
+    var o11 = raw11 ? JSON.parse(raw11) : null;
+    if (o11 && typeof o11.p === 'string' && o11.p.indexOf('data:image/png') === 0) { ok11 = true; len11 = o11.p.length; }
+    if (o11 && (o11.brush !== state.brush || o11.hardness !== state.hardness)) ok11 = false;
   } catch (err) { }
-  rec('ST8', ok8, 'localStorage сохранён, краска ' + len8 + ' симв.');
+  rec('ST11', ok11, 'localStorage сохранён (краска ' + len11 + ' симв., кисть/жёсткость в стейте)');
 
   undoStack.length = 0; redoStack.length = 0;
   pctx.clearRect(0, 0, W, H);
@@ -848,6 +1170,7 @@ function ready() {
   composite();
   tryRestore();
   renderHistory();
+  updateUndoUI();
 }
 assets.base.onload = ready;
 assets.base.onerror = function () { };
@@ -876,6 +1199,7 @@ window.PAINT = {
   undo: doUndo, redo: doRedo,
   clearPaint: clearPaint,
   setColor: setColor,
+  setBrush: setBrush,
   history: function () { return history.slice(); },
   composite: composite,
   persistNow: persistNow,
