@@ -66,6 +66,14 @@
 
   .bdiv { width: 1px; align-self: stretch; background: #35373d; }
 
+  .penopt {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    color: #8f939c; white-space: nowrap; user-select: none; -webkit-user-select: none;
+  }
+  .penopt:hover { color: #d7d9de; }
+  .penopt input { accent-color: #f5a94b; width: 14px; height: 14px; cursor: pointer; margin: 0; }
+
   .sliders { display: flex; align-items: center; gap: 10px; flex: 1 1 320px; min-width: 0; }
   .sgrp { display: flex; align-items: center; gap: 7px; flex: 1 1 0; min-width: 96px; }
   .sgrp .lab { font-size: 9.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #8f939c; white-space: nowrap; }
@@ -250,6 +258,11 @@
             <span class="val" id="opacityVal">100%</span>
           </div>
         </div>
+        <div class="bdiv"></div>
+        <label class="penopt" title="Графический планшет: чем сильнее нажим пером, тем толще мазок. Перевёрнутое перо (ластик-кончик) стирает">
+          <input type="checkbox" id="penPress" checked>
+          <span>перо: толщина от нажима</span>
+        </label>
       </div>
 
       <div class="stage">
@@ -362,6 +375,7 @@ var state = {
   size: 6,                /* диаметр кисти, арт-px */
   hardness: 70,           /* 0 мягкая кромка .. 100 резкая */
   opacity: 100,
+  penPress: true,         /* перо: толщина мазка от нажима (давление 0..1) */
   color: '#f5e5ce',
   prevColor: '#828a8f'
 };
@@ -562,6 +576,17 @@ function stampSpray(uA, x, y, r, seed, nocap) {
   }
 }
 
+/* ---------- перо: масштаб радиуса от давления ----------
+   0.18 — минимальный след при лёгком касании, кривая p^1.4 — как в
+   графредакторах; мышь/touch и выключенная опция дают полный радиус */
+function ptPress(pt) { return (pt && typeof pt.p === 'number') ? pt.p : 1; }
+function penScale(o, pt) {
+  if (!o.pena) return o.radius;
+  var pv = Math.max(0, Math.min(1, ptPress(pt)));
+  var sc = 0.18 + 0.82 * Math.pow(pv, 1.4);
+  return Math.max(0.4, o.radius * sc);
+}
+
 /* ---------- живой мазок: путь штампов, per-px MAX-альфа ---------- */
 var liveStroke = null;   /* { pts, erase, color, alpha, radius, hard, brush } */
 var uA = new Uint8Array(W * H);
@@ -579,17 +604,22 @@ function redrawLive() {
      добавление новых точек НЕ меняет вид старой части линии — карандаш и
      спрей больше не «дёргаются», пока курсор не отпущен */
   if (pts.length === 1) {
-    placeStamp(pts[0].x, pts[0].y, 0, o, 77);
+    placeStamp(pts[0].x, pts[0].y, 0, o, 77, penScale(o, pts[0]));
   } else {
     for (var k = 1; k < pts.length; k++) {
       var pA = pts[k - 1], pB = pts[k];
       var dx = pB.x - pA.x, dy = pB.y - pA.y;
       var dist = Math.sqrt(dx * dx + dy * dy);
-      var step = Math.max(0.4, o.radius * 0.30);
+      var rA = penScale(o, pA), rB = penScale(o, pB);
+      var step = Math.max(0.4, Math.max(rA, rB) * 0.30);
       var steps = Math.max(1, Math.ceil(dist / step));
       for (var s = 1; s <= steps; s++) {
-        placeStamp(pA.x + dx * s / steps, pA.y + dy * s / steps,
-          Math.atan2(dy, dx), o, 1000 + k * 131 + s);
+        /* вдоль сегмента радиус и давление интерполируются —
+           толщина мазка следует за нажимом пера */
+        var tt = s / steps;
+        var rr = rA + (rB - rA) * tt;
+        placeStamp(pA.x + dx * tt, pA.y + dy * tt,
+          Math.atan2(dy, dx), o, 1000 + k * 131 + s, rr);
       }
     }
   }
@@ -602,12 +632,23 @@ function redrawLive() {
   }
   lctx.putImageData(liveImg, 0, 0);
 }
-function placeStamp(x, y, ang, o, seed) {
-  var r = o.radius, hard = o.hard, nc = o.erase === true;
+function placeStamp(x, y, ang, o, seed, rOverride) {
+  var r = rOverride != null ? rOverride : o.radius, hard = o.hard, nc = o.erase === true;
   if (o.brush === 'pencil') stampPencil(uA, x, y, r, seed, nc);
   else if (o.brush === 'spray') stampSpray(uA, x, y, r, seed, nc);
   else if (o.brush === 'flat') stampFlat(uA, x, y, r, hard, ang, nc);
   else stampRound(uA, x, y, r, hard, nc);
+}
+function liveStrokeParams() {
+  return {
+    erase: state.tool === 'eraser',
+    color: state.color,
+    alpha: state.opacity / 100,
+    radius: Math.max(1, state.size / 2),
+    hard: state.hardness / 100,
+    brush: (state.tool === 'eraser') ? 'round' : state.brush,
+    pena: state.penPress === true
+  };
 }
 function liveStampParams() {
   return {
@@ -619,20 +660,22 @@ function liveStampParams() {
     brush: state.tool === 'eraser' && state.brush === 'flat' ? 'round' : state.brush
   };
 }
-function liveBegin(x, y) {
+function liveBegin(x, y, pr) {
   pushUndo();
-  liveStroke = { pts: [{ x: x, y: y }] };
+  var pv = (typeof pr === 'number' && pr >= 0) ? Math.min(1, pr) : 1;
+  liveStroke = { pts: [{ x: x, y: y, p: pv }] };
   var p = liveStroke;
   var lp = liveStrokeParams();
   for (var kk in lp) p[kk] = lp[kk];
   redrawLive();
   composite();
 }
-function liveMove(x, y) {
+function liveMove(x, y, pr) {
   if (!liveStroke) return;
   var last = liveStroke.pts[liveStroke.pts.length - 1];
   if (Math.abs(x - last.x) + Math.abs(y - last.y) < 0.35) return;
-  liveStroke.pts.push({ x: x, y: y });
+  var pv = (typeof pr === 'number' && pr >= 0) ? Math.min(1, pr) : 1;
+  liveStroke.pts.push({ x: x, y: y, p: pv });
   redrawLive();
   composite();
 }
@@ -648,16 +691,6 @@ function liveEnd() {
   liveStroke = null;
   composite(); schedulePersist();
 }
-function liveStrokeParams() {
-  return {
-    erase: state.tool === 'eraser',
-    color: state.color,
-    alpha: state.opacity / 100,
-    radius: Math.max(1, state.size / 2),
-    hard: state.hardness / 100,
-    brush: (state.tool === 'eraser') ? 'round' : state.brush
-  };
-}
 /* программный мазок для тестов/зондов: путь (x0,y0)->(x1,y1) */
 function strokeLine(x0, y0, x1, y1, uo) {
   var o = {
@@ -669,12 +702,14 @@ function strokeLine(x0, y0, x1, y1, uo) {
     brush: (uo && uo.brush) || state.brush
   };
   pushUndo();
-  liveStroke = { pts: [{ x: x0, y: y0 }] };
+  var pr0 = (uo && typeof uo.pressure === 'number') ? Math.max(0, Math.min(1, uo.pressure)) : 1;
+  liveStroke = { pts: [{ x: x0, y: y0, p: pr0 }] };
   for (var kk in o) liveStroke[kk] = o[kk];
+  liveStroke.pena = !!(uo && typeof uo.pressure === 'number' && uo.pen !== false);
   var dx = x1 - x0, dy = y1 - y0, dist = Math.sqrt(dx * dx + dy * dy);
   var steps = Math.max(1, Math.ceil(dist * 2));
   for (var t = 1; t <= steps; t++)
-    liveStroke.pts.push({ x: x0 + dx * t / steps, y: y0 + dy * t / steps });
+    liveStroke.pts.push({ x: x0 + dx * t / steps, y: y0 + dy * t / steps, p: pr0 });
   redrawLive();
   pctx.globalCompositeOperation = o.erase ? 'destination-out' : 'source-over';
   pctx.globalAlpha = o.alpha;
@@ -753,7 +788,7 @@ function persistNow() {
     localStorage.setItem(KEY, JSON.stringify({
       p: paintCv.toDataURL('image/png'),
       color: state.color, size: state.size, opacity: state.opacity,
-      brush: state.brush, hardness: state.hardness,
+      brush: state.brush, hardness: state.hardness, penPress: state.penPress,
       history: history.slice(0, HIST_MAX)
     }));
   } catch (e) { }
@@ -776,6 +811,10 @@ function tryRestore() {
       state.opacity = Math.round(o.opacity / 5) * 5;
       $('opacity').value = state.opacity;
       $('opacityVal').textContent = state.opacity + '%';
+    }
+    if (o && typeof o.penPress === 'boolean') {
+      state.penPress = o.penPress;
+      $('penPress').checked = o.penPress;
     }
     if (o && Object.prototype.toString.call(o.history) === '[object Array]') {
       o.history.forEach(function (h) {
@@ -1063,15 +1102,34 @@ function artPoint(e) {
     y: (e.clientY - r.top) / r.height * H
   };
 }
+/* давление пера: только pointerType pen/eraser несёт осмысленный 0..1;
+   мышь (0.5 при нажатии) и касание не модулируют — рисуют полным радиусом */
+function penPr(e) {
+  if (!state.penPress) return 1;
+  if (e.pointerType === 'pen' || e.pointerType === 'eraser') {
+    var pr = e.pressure;
+    return (typeof pr === 'number' && pr > 0) ? Math.min(1, pr) : 0.5;
+  }
+  return 1;
+}
+/* перевёрнутое перо = ластик (кончик-резинкой, как в Krita) */
+var penFlip = false, penPrevTool = null;
 var activePtr = null;
 work.addEventListener('pointerdown', function (e) {
   e.preventDefault();
   if (activePtr !== null) return;
+  if (e.pointerType === 'eraser' && state.tool !== 'eraser') {
+    penFlip = true;
+    penPrevTool = state.tool;
+    setTool('eraser');
+  } else {
+    penFlip = false;
+  }
   var p = artPoint(e);
   if (state.tool === 'brush' || state.tool === 'eraser') {
     activePtr = e.pointerId;
     try { work.setPointerCapture(e.pointerId); } catch (err) { }
-    liveBegin(p.x, p.y);
+    liveBegin(p.x, p.y, penPr(e));
   } else if (state.tool === 'fill') {
     floodFillAt(Math.floor(p.x), Math.floor(p.y));
   } else if (state.tool === 'picker') {
@@ -1084,15 +1142,24 @@ work.addEventListener('pointermove', function (e) {
   var evs = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
   for (var i = 0; i < evs.length; i++) {
     var p = artPoint(evs[i]);
-    liveMove(p.x, p.y);
+    liveMove(p.x, p.y, penPr(evs[i]));
   }
 });
 function ptrUp(e) {
-  if (activePtr === e.pointerId) { activePtr = null; liveEnd(); }
+  if (activePtr !== e.pointerId) return;
+  activePtr = null;
+  liveEnd();
+  if (penFlip) { penFlip = false; setTool(penPrevTool); }
 }
 work.addEventListener('pointerup', ptrUp);
 work.addEventListener('pointercancel', ptrUp);
-work.addEventListener('lostpointercapture', function (e) { if (activePtr === e.pointerId) { activePtr = null; liveEnd(); } });
+work.addEventListener('lostpointercapture', function (e) {
+  if (activePtr === e.pointerId) {
+    activePtr = null;
+    liveEnd();
+    if (penFlip) { penFlip = false; setTool(penPrevTool); }
+  }
+});
 
 /* ---------- кнопки ---------- */
 $('toolBrush').onclick = function () { setTool('brush'); };
@@ -1119,6 +1186,10 @@ $('sizeRange').addEventListener('input', function () {
   state.size = parseInt(this.value, 10);
   $('sizeVal').textContent = String(state.size);
   drawBrushPrev();
+  schedulePersist();
+});
+$('penPress').addEventListener('change', function () {
+  state.penPress = this.checked;
   schedulePersist();
 });
 $('btnUndo').onclick = doUndo;
@@ -1390,6 +1461,20 @@ function runSelfTest() {
   setBrush('round');
   rec('ST13', hBefore13 === hAfter13 && undoOk13,
     'карандаш стабилен: hash до ' + hBefore13 + ' == после ' + hAfter13 + ' (старая часть не дёргается); undo: ' + undoOk13);
+
+  /* ST14: ПЕРО — давление модулирует толщину (pressure 1.0 vs 0.22) */
+  var P14 = snapPaint();
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y,
+    { brush: 'round', size: 12, hardness: 100, color: '#6fa8ff', opacity: 100, pressure: 1 });
+  var wFull = countOnCol(snapPaint(), BODY.x + 7);
+  var undo1 = doUndo() && dataEqual(snapPaint(), P14);
+  strokeLine(BODY.x, BODY.y, BODY.x + 14, BODY.y,
+    { brush: 'round', size: 12, hardness: 100, color: '#6fa8ff', opacity: 100, pressure: 0.22 });
+  var wSoft = countOnCol(snapPaint(), BODY.x + 7);
+  var undo2 = doUndo() && dataEqual(snapPaint(), P14);
+  rec('ST14', undo1 && undo2 && wFull >= 9 && wSoft >= 1 && wSoft <= wFull - 5,
+    'перо: полный нажим ' + wFull + ' px, лёгкий ' + wSoft + ' px (жду сильную разницу и undo x2: ' +
+    (undo1 && undo2) + ')');
 
   undoStack.length = 0; redoStack.length = 0;
   pctx.clearRect(0, 0, W, H);
