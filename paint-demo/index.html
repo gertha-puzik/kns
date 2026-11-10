@@ -283,7 +283,7 @@
   <header class="top">
     <div class="brand">&#128062; KNS Paint</div>
     <div class="tagline">краска не выходит за кота · контур всегда поверх рисунка</div>
-    <div class="keys"><b>1–6</b> инструменты · <b>L</b> лассо · <b>M</b> двигать слой · <b>B</b> кисть · <b>Ctrl+Z</b> отмена · <b>Ctrl+Shift+Z</b> повтор · <b>Ctrl+C</b>/<b>V</b> копировать/вставить</div>
+    <div class="keys"><b>1–6</b> инструменты · <b>L</b> лассо · <b>M</b> двигать слой · <b>B</b> кисть · <b>Ctrl+Z</b> отмена · <b>Ctrl+Shift+Z</b> повтор · <b>Ctrl+C</b>/<b>V</b> копировать/вставить · <b>Esc</b> снять выделение</div>
   </header>
 
   <div class="main">
@@ -312,6 +312,9 @@
       </button>
       <button type="button" class="dbtn" id="btnRedo" title="Вернуть (Ctrl/Cmd+Shift+Z)" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5l5 5-5 5"/><path d="M21 10H10a6 6 0 0 0-6 6v3"/></svg>
+      </button>
+      <button type="button" class="dbtn" id="btnSelClear" title="Снять выделение (Esc / Ctrl+D)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2" stroke-dasharray="3 2"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></svg>
       </button>
     </nav>
 
@@ -1026,10 +1029,12 @@ function antsLoop(ts) {
   antsReq = requestAnimationFrame(antsLoop);
 }
 function ensureAnts() { if (antsReq === null) antsReq = requestAnimationFrame(antsLoop); }
+function updateSelUI() { $('btnSelClear').disabled = !sel; }
 function clearSel(silent) {
   var had = !!sel;
   sel = null; selDrag = null;
   octx.clearRect(0, 0, W, H);
+  updateSelUI();
   if (!silent && had) toast('выделение снято');
 }
 function setSelPath(pts) {
@@ -1047,6 +1052,7 @@ function setSelPath(pts) {
   for (var j = 0; j < W * H; j++) if (mask[j]) mimg.data[j * 4 + 3] = 255;
   mc.putImageData(mimg, 0, 0);
   sel = { mask: mask, maskCv: mcv, pts: pts.slice(), n: n };
+  updateSelUI();
   ensureAnts();
 }
 function copySelArea() {
@@ -1098,6 +1104,10 @@ function moveBy(dx, dy) {
   }
   pctx.clearRect(0, 0, W, H);
   pctx.drawImage(moveDrag.cv, dx, dy);
+  /* кот = холст: подвинутое за силуэт не существует (клип как в restore/import) */
+  pctx.globalCompositeOperation = 'destination-in';
+  pctx.drawImage(baseCv, 0, 0);
+  pctx.globalCompositeOperation = 'source-over';
   composite();
 }
 function moveEnd() {
@@ -1775,6 +1785,7 @@ $('penPress').addEventListener('change', function () {
 });
 $('btnUndo').onclick = doUndo;
 $('btnRedo').onclick = doRedo;
+$('btnSelClear').onclick = function () { if (sel || selDrag) clearSel(false); };
 $('btnClear').onclick = clearPaint;
 $('hexIn').addEventListener('input', function () { setColor(this.value); });
 $('hexIn').addEventListener('blur', function () { this.value = state.color; });
@@ -2531,10 +2542,10 @@ async function runSelfTestAsync() {
   /* перенос активного слоя: пробы по снимку активного слоя, вектор больше радиуса кисти */
   var PS19 = snapPaint();
   moveBegin(BODY.x, BODY.y);
-  moveBy(30, -12);
+  moveBy(-24, -9);
   moveEnd();
   var mv19 = snapPaint();
-  var o719 = ((BODY.y - 12) * W + BODY.x + 34) * 4;       /* сюда приехал центр мазка */
+  var o719 = ((BODY.y - 9) * W + BODY.x - 19) * 4;       /* сюда приехал центр мазка — посадка в тело, клипу не мешает */
   var mvOk19 = mv19.data[o719 + 3] > 200 && Math.abs(mv19.data[o719] - 255) < 20 &&
     mv19.data[(BODY.y * W + BODY.x + 4) * 4 + 3] === 0;   /* оттуда, где был мазок, — чисто */
   var mvUndo19 = doUndo() && dataEqual(snapPaint(), PS19);
@@ -2582,6 +2593,42 @@ async function runSelfTestAsync() {
     ', вставка ' + pasteOk19 + ' (undo ' + undoV19 + ', redo-ру ' + redoV19 + ')' +
     ', перенос ' + mvOk19 + '/undo ' + mvUndo19 + ', мышью ' + ptrMoved19 + 'px/undo ' + ptrUndo19 +
     ', лассо-события ' + lassoPtrOk19 + ', Esc ' + escOk19 + ', откат ' + roll19 + '/' + clean19);
+
+  /* ST20: КОТ-ХОЛСТ ПРИ ПЕРЕНОСЕ + КНОПКА «СНЯТЬ ВЫДЕЛЕНИЕ» (v8.3) */
+  var mark20 = undoStack.length;
+  var nLy20 = layers.length;
+  var A20 = snapPaint();
+  clearSel(true);
+  strokeLine(BODY.x, BODY.y, BODY.x + 10, BODY.y, { size: 10, hardness: 100, color: '#ff00d0', opacity: 100 });
+  var P20 = snapPaint();
+  var inkA20 = 0, p20d = P20.data;
+  for (var a20 = 3; a20 < p20d.length; a20 += 4) if (p20d[a20] > 0) inkA20++;
+  /* увозим мазок вниз, в «воздух» под котом: без клипа краска висела бы за силуэтом */
+  moveBegin(BODY.x, BODY.y);
+  moveBy(0, 90);
+  moveEnd();
+  var M20 = snapPaint();
+  var out20 = 0, inkM20 = 0, md20 = M20.data;
+  for (var m20 = 0; m20 < W * H; m20++) {
+    if (md20[m20 * 4 + 3] > 0) { inkM20++; if (!silArr[m20]) out20++; }
+  }
+  var clipOk20 = inkM20 === 0 && out20 === 0;             /* краска за котом не пережила клип */
+  var mvUndo20 = doUndo() && dataEqual(snapPaint(), P20);
+  /* кнопка снятия выделения: активна при живом sel, клик снимает */
+  setSelPath([{ x: BODY.x - 5, y: BODY.y - 12 }, { x: BODY.x + 21, y: BODY.y - 12 },
+              { x: BODY.x + 21, y: BODY.y + 12 }, { x: BODY.x - 5, y: BODY.y + 12 }]);
+  var btn20 = $('btnSelClear');
+  var btnLive20 = !!sel && !btn20.disabled;
+  btn20.click();
+  var btnOk20 = sel === null && btn20.disabled;
+  var roll20 = true;
+  while (undoStack.length > mark20 && undoStack.length > 0) roll20 = doUndo() && roll20;
+  clearSel(true);
+  var clean20 = layers.length === nLy20 && dataEqual(snapPaint(), A20);
+  rec('ST20', clipOk20 && mvUndo20 && btnLive20 && btnOk20 && roll20 && clean20,
+    'кот-холст: мазок ' + inkA20 + 'px уехал вниз — осталось ' + inkM20 + ', вне кота ' + out20 + ' (жду 0/0)' +
+    ', undo ' + mvUndo20 + '; кнопка снятия: активна ' + btnLive20 + ', клик → sel null ' + btnOk20 +
+    ', откат ' + roll20 + '/' + clean20);
 
   /* финал: один чистый слой, стеки пусты */
   undoStack.length = 0; redoStack.length = 0;
