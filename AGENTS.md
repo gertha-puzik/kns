@@ -2,7 +2,7 @@
 
 KNS is a prototype coat-color editor for the owner's game coop-field.
 Live: https://kns.miew.ru (pure static, served from `/opt/kns/www` on the VPS).
-This repo is private; every push to `main` triggers CI (rsync) deploy — see
+This repo stays public; every push to `main` triggers CI (rsync) deploy — see
 `.github/workflows/deploy.yml`.
 
 **Read `KNS-CONTEXT.md` first** — it is the single-file canon (project status,
@@ -22,11 +22,13 @@ map; when the two disagree, `KNS-CONTEXT.md` wins.
 
 ## Repo layout
 
-`index.html` — the editor (24 slots, layered tinting, export/import of
-`id/color|alpha` codes); `catwar-manifest.js` — slot/file manifest (`assetRoot`
-must stay `''` in-repo — prod invariant); `tint.js` — tinting helpers;
-`gray/`, `act0/`, `act1/` — layered source PNGs; `model/`, `artpack/` — base
-art; `weather-demo/` — weather demo; `img/` — static extras.
+`index.html` — one sentence: the reference pack is no longer shipped
+(same notice on `tint.html`, `mask-annotator.html`, `frames-studio.html`).
+`act0/`, `act1/`, `gray/`, `artpack/`, `model/`, `archive/`, `tint.js` and
+`catwar-manifest.js` are removed from the tree and must not be added back;
+git history is left as-is. `paint-demo/` stays. `weather-demo/` — weather
+demo; `img/` — static extras. If `catwar-manifest.js` is ever restored,
+`assetRoot` must stay `''`.
 
 ## Workflow (condensed; full protocol = KNS-CONTEXT §8.7)
 
