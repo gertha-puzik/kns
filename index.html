@@ -44,6 +44,11 @@
   .sw.sel { border: 2px solid #d33; width: 28px; height: 20px; }
   .gate-msg { color: #933; font-size: 11px; margin-top: 4px; }
   textarea { font: 11px monospace; width: 98%; height: 34px; }
+  /* «Надеть в игре» (перенос окраса в игру): заметная, но в тон выделений страницы (цвета .cat-item.sel / button.active) */
+  #btn-wear { font-weight: bold; background: #d8e8d8; border-color: #7a9a7a #98b898 #98b898 #7a9a7a; }
+  #btn-wear:hover { background: #cfe0cf; }
+  /* мини-тост сообщений кнопки (нижний правый угол, ретро-стиль страницы) */
+  #kns-toast { position: fixed; right: 12px; bottom: 12px; max-width: 330px; background: #8a2f2a; color: #fff; border: 1px solid #6a1f1a; padding: 6px 12px; font-size: 12px; display: none; z-index: 20; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
   .hdr { font-weight: bold; color: #5d7a61; border-bottom: 1px dashed #bbb; padding-bottom: 2px; margin-bottom: 5px; }
   input[type=range] { width: 120px; vertical-align: middle; }
   /* модель-пара: ходьба (анимация) + сид-калачик всегда рядом (2026-11-05).
@@ -78,6 +83,10 @@
       <div class="row"><textarea id="code-in" placeholder="вставь код из CatWar и нажми «Применить код»"></textarea></div>
       <div class="row"><button id="btn-apply">Применить код</button> <span class="note">формат CatWar: блок = <code>слой-слой-…</code>, слой = <code>id/цвет|прозр0-10</code> или <code>цвет|прозр0-10</code>; <code>0</code> = пусто; |p → 50..100%</span></div>
       <div class="row"><textarea id="code-out" readonly></textarea></div>
+      <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button id="btn-wear" title="Откроется ваш профиль в игре — там нажмите „Сохранить и надеть“">Надеть в игре</button>
+        <span class="note">Окрас перенесётся в ваш профиль в игре</span>
+      </div>
       <div class="note" id="skip-note" style="display:none;color:#933"></div>
     </details>
   </div>
@@ -773,6 +782,32 @@ function randomize() {
 function resetAll() { state = DEFAULT_STATE(); persist(); resetModelOpts(); render(); renderModel(); buildCategories(); buildSlotPanel(); }
 function updateCodeBox() { const s = encodeCode(); document.getElementById('code-out').value = s; return s; }
 
+// ---------- «Надеть в игре»: перенос текущего окраса в профиль игры (deep-link, без POST) ----------
+// Игра «Элизия Эйдес» (phainonsmilk.ru) сама валидирует код по грамматике CatWar, рендерит
+// превью в профиле и надевает окрас только после кнопки «Сохранить и надеть» самого игрока.
+// Из конструктора уходит ТОЛЬКО ссылка: ?coat=<encodeURIComponent(код)>#settings, window.open с noopener.
+// Пустой/дефолтный код тоже уходит — что надевать, решает игрок уже в игре.
+function knsToast(msg) {
+  const t = document.getElementById('kns-toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(knsToast._tm);
+  knsToast._tm = setTimeout(function () { t.style.display = 'none'; }, 3500);
+}
+function wearInGame() {
+  let code;
+  try { code = encodeCode(); }
+  catch (e) { // код не собрался: новую вкладку НЕ открываем, ошибка видна в консоли и зонду приёмки
+    __knsErr.push('wearInGame: не получилось собрать код окраса — ' + ((e && e.message) || e));
+    console.error('[kns] не получилось собрать код окраса', e);
+    knsToast('Не получилось собрать код окраса — в игру не перенесено.');
+    return;
+  }
+  window.open('https://phainonsmilk.ru/players/?coat=' + encodeURIComponent(code) + '#settings', '_blank', 'noopener');
+}
+document.getElementById('btn-wear').onclick = wearInGame;
+
 document.getElementById('btn-walk').onclick = () => setPose('walk');
 document.getElementById('btn-sit').onclick = () => setPose('sit');
 document.getElementById('btn-random').onclick = randomize;
@@ -827,5 +862,6 @@ if (typeof Tint === 'undefined') {
   });
 }
 </script>
+<div id="kns-toast"></div>
 </body>
 </html>
