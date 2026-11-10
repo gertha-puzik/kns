@@ -161,6 +161,8 @@ footer{color:#777;font-size:11px;text-align:center;padding:10px 0 4px}
 </div>
 
 <script src="artpack/frames-studio-data.js"></script>
+<script src="cat_h.js"></script>
+<script src="cat-scale.js"></script>
 <script>
 "use strict";
 /* ===== Студия кадров KNS: чеклист 43 кадров + walk-превью + квантование зон =====
@@ -454,9 +456,18 @@ function reschedule() {
 function renderAnim() {
   var seq = seqOf(), name = seq.frames[seqPos], f = FRAME_BY_NAME[name].frame;
   var n = seq.frames.length;
-  var w = Math.max(1, Math.round(CVH * f.w / f.h));
   var cvU = $('acv'), cvO = $('acv-old');
   var ux = cvU.getContext('2d'), ox = cvO.getContext('2d');
+  // ЕДИНЫЙ МАСШТАБ КОТА (карточка размеров): s = T/catH, ноги на пол, силуэт
+  // по центру — механизм витрины /archive; данные cat_h.js (tools/measure_cat_h.py).
+  // Нет данных/кадр bad — прежний фул-фрейм-фит (вся анимация одинакова в любом случае).
+  var ref = String(f.src || '').replace(/^\.?\//, '').replace(/\.png$/, '');
+  var d = (typeof KNS_CAT_H !== 'undefined') ? KNS_CAT_H[ref] : null;
+  var T = (typeof KNS_CAT_SCALE !== 'undefined') ? KNS_CAT_SCALE.TARGETS.framesStudio.T : 0;
+  var catFit = !!(T && d && !d.bad);
+  var s = catFit ? T / d.h : 0;
+  var w = catFit ? Math.max(80, Math.ceil(d.w * s) + 16)
+                 : Math.max(1, Math.round(CVH * f.w / f.h));
   cvU.width = w; cvU.height = CVH; cvO.width = w; cvO.height = CVH;
   ux.imageSmoothingEnabled = false; ox.imageSmoothingEnabled = false;
   ux.clearRect(0, 0, w, CVH); ox.clearRect(0, 0, w, CVH);
@@ -467,7 +478,9 @@ function renderAnim() {
   var rec = LOADED[name];
   if (rec) {
     cvU.hidden = false; cvO.hidden = true;
-    ux.drawImage(zoneMode && rec.zoneCanvas ? rec.zoneCanvas : rec.img, 0, 0, w, CVH);
+    var srcImg = zoneMode && rec.zoneCanvas ? rec.zoneCanvas : rec.img;
+    if (!(catFit && KNS_CAT_SCALE.drawFitted(ux, cvU, srcImg, ref, T, false)))
+      ux.drawImage(srcImg, 0, 0, w, CVH);
     return;
   }
   cvU.hidden = true; cvO.hidden = false;
@@ -479,7 +492,9 @@ function renderAnim() {
     ox.clearRect(0, 0, cvO.width, cvO.height);
     ox.imageSmoothingEnabled = false;
     ox.globalAlpha = 0.45;                          // «старый кадр»: приглушаем исходник
-    ox.drawImage(o.img, 0, 0, cvO.width, cvO.height);
+    var fo = catFit ? KNS_CAT_SCALE.fitRect(cvO.width, cvO.height, o.img, ref, T, false) : null;
+    if (fo) ox.drawImage(o.img, fo.dx, fo.dy, fo.dw, fo.dh);
+    else ox.drawImage(o.img, 0, 0, cvO.width, cvO.height);
     ox.globalAlpha = 1;
     if (zoneMode) {
       origZone(name, function (zc) {
@@ -487,7 +502,11 @@ function renderAnim() {
         ox.clearRect(0, 0, cvO.width, cvO.height);
         ox.imageSmoothingEnabled = false;
         ox.globalAlpha = 0.45;
-        if (zc) ox.drawImage(zc, 0, 0, cvO.width, cvO.height);
+        if (zc) {
+          var fz = catFit ? KNS_CAT_SCALE.fitRect(cvO.width, cvO.height, zc, ref, T, false) : null;
+          if (fz) ox.drawImage(zc, fz.dx, fz.dy, fz.dw, fz.dh);
+          else ox.drawImage(zc, 0, 0, cvO.width, cvO.height);
+        }
         else {
           ox.drawImage(o.img, 0, 0, cvO.width, cvO.height);
           show($('znfail'), true);                  // file://: исходник не считывается

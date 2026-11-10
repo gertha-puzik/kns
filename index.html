@@ -5,6 +5,8 @@
 <title>Конструктор окрасов — прототип coop-field (референс CatWar)</title>
 <script src="catwar-manifest.js"></script>
 <script src="tint.js"></script>
+<script src="cat_h.js"></script>
+<script src="cat-scale.js"></script>
 <style>
   /* ретро-стиль в духе оригинального CatWar kns.php */
   * { box-sizing: border-box; }
@@ -95,11 +97,11 @@
     <div class="catname">Модель — база M2</div>
     <div class="model-pair" id="model-pair">
       <div class="model-cell">
-        <canvas id="model" width="100" height="150"></canvas>
+        <canvas id="model" width="176" height="150"></canvas>
         <div class="model-cap">Ходьба (анимация)</div>
       </div>
       <div class="model-cell">
-        <canvas id="model-sit" width="100" height="150"></canvas>
+        <canvas id="model-sit" width="176" height="150"></canvas>
         <div class="model-cap">Сид (калачик)</div>
       </div>
     </div>
@@ -440,9 +442,9 @@ function modelFile() {
   return MODEL_FRAMES_WALK[modelOpts.build][modelOpts.tail][modelFrame % 4]; // левая клетка пары — всегда ходьба
 }
 function renderModel() {
-  mctx.clearRect(0, 0, W, H);
+  mctx.clearRect(0, 0, mcv.width, mcv.height);
   if (modelTintable()) {
-    if (Tint.render(mcv, { build: modelOpts.build, key: MODEL_WALK_KEYS[modelFrame % 4], state: state })) {
+    if (Tint.render(mcv, { build: modelOpts.build, key: MODEL_WALK_KEYS[modelFrame % 4], state: state, fit: 'editorPair' })) {
       modelMode = 'tint'; modelTintNote();
       return;
     }
@@ -450,12 +452,18 @@ function renderModel() {
   }
   modelMode = 'static'; modelTintNote();
   const im = modelImg(modelFile());
-  if (im && im.complete && im.naturalWidth > 0) mctx.drawImage(im, 0, 0);
+  if (im && im.complete && im.naturalWidth > 0) {
+    // кат-фит: кот одной высоты TARGETS.editorPair.T, ноги на пол, по центру (механизм витрины /archive)
+    const ref = modelFile().replace(/\.png$/, '');
+    if (!(typeof KNS_CAT_SCALE !== 'undefined' &&
+          KNS_CAT_SCALE.drawFitted(mctx, mcv, im, ref, KNS_CAT_SCALE.TARGETS.editorPair.T, false)))
+      mctx.drawImage(im, 0, 0); // фолбэк: нет данных cat_h.js — кадр как есть
+  }
 }
 function renderModelSit() { // правая клетка пары — всегда сид-калачик
-  msctx.clearRect(0, 0, W, H);
+  msctx.clearRect(0, 0, mscv.width, mscv.height);
   if (modelTintable()) { // сид красится только когда красится и ходьба — пара согласована
-    if (Tint.render(mscv, { build: modelOpts.build, key: '0', state: state })) {
+    if (Tint.render(mscv, { build: modelOpts.build, key: '0', state: state, fit: 'editorPair' })) {
       modelSitMode = 'tint';
       return;
     }
@@ -463,7 +471,12 @@ function renderModelSit() { // правая клетка пары — всегд
   }
   modelSitMode = 'static';
   const im = modelImg(MODEL_FRAMES_SIT[modelOpts.build]);
-  if (im && im.complete && im.naturalWidth > 0) msctx.drawImage(im, 0, 0);
+  if (im && im.complete && im.naturalWidth > 0) {
+    const ref = MODEL_FRAMES_SIT[modelOpts.build].replace(/\.png$/, '');
+    if (!(typeof KNS_CAT_SCALE !== 'undefined' &&
+          KNS_CAT_SCALE.drawFitted(msctx, mscv, im, ref, KNS_CAT_SCALE.TARGETS.editorPair.T, false)))
+      msctx.drawImage(im, 0, 0);
+  }
 }
 function buildModelButtons() {
   const hostB = document.getElementById('model-build');
