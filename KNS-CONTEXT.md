@@ -6,7 +6,7 @@
 
 **KNS Paint** — браузерный редактор окрасов: игрок красит кота кистью поверх скетча (300×200, прозрачный фон, краска клипнута по силуэту) и выгружает PNG для игры **coop-field** заказчицы (https://abnocw.phainonsmilk.ru, репо github.com/gertha-puzik/coop-field). Решение заказчицы от 2026-11-14: из всех направлений KNS продуктом остаётся только Paint.
 
-- Сайт: **https://paint.phainonsmilk.ru** (корень = редактор). Прежние адреса `kns.phainonsmilk.ru` и `kns.miew.ru` должны вести 301 на него; vhost, DNS и сертификат заводит заказчица, агенты на VPS не ходят.
+- Сайт: **https://paint.phainonsmilk.ru** (корень = редактор). Прежние адреса `kns.phainonsmilk.ru` и `kns.miew.ru` ведут 301 на него с сохранением пути (с 2026-11-14). nginx: vhost `paint.phainonsmilk.ru.conf` (сертификат Let's Encrypt, webroot = каталог деплоя), `kns.phainonsmilk.ru.conf` и `kns.miew.ru.conf` — только редиректы; их сертификаты оставлены, чтобы старые https-ссылки не падали. Правки на VPS — только по прямой просьбе заказчицы.
 - Каталог на VPS прежний (см. `.github/workflows/deploy.yml`), деплой — CI (rsync) при пуше в `main`.
 - `/paint-demo/` — редирект на корень с сохранением `?query` и `#hash`, чтобы старые ссылки и диплинки работали.
 - В coop-field лежит своя копия редактора (`public/paint-demo/`, с `game-bridge.js`). Её сверяют и обновляют отдельным PR в coop-field; этот репозиторий её не трогает.
