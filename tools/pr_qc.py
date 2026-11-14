@@ -8,7 +8,6 @@
   (жертвы fuzzy-патчей с потерянной парной скобкой — страница «ещё работает»);
 - артефактные CJK-символы в текстовых файлах (мусор ИИ-патчей/склеек);
 - шаблон 'act{act}' (баг actact1 — канва молча пустая);
-- невалидный assetRoot репо-манифеста (прод-инвариант '': иначе canvas пустой при 200-х).
 
 Пиксельные A/B и браузерные зонды — вне гейта, их ведёт агент в рантайме.
 Провал = красный чек 'KNS QC / qc' => мердж в main заблокирован.
@@ -70,7 +69,7 @@ def node_check(code, label):
 print("== 1/5 JSON-файлы ==")
 jsons = [p for p in sorted(ROOT.rglob("*.json")) if not skip(p)]
 if not jsons:
-    print("  — json-файлов нет (манифест живёт в catwar-manifest.js)")
+    print("  — json-файлов нет")
 for p in jsons:
     try:
         json.loads(p.read_text(encoding="utf-8"))
@@ -131,23 +130,7 @@ for p in text_files:
 if not cjk_hits:
     ok(f"CJK-мусора нет ({len(text_files)} текстовых файлов)")
 
-print("== 5/5 Инварианты манифеста и прод-паттернов ==")
-manifest = ROOT / "catwar-manifest.js"
-if manifest.exists():
-    txt = manifest.read_text(encoding="utf-8")
-    m = re.search(r"[\"']?assetRoot[\"']?\s*:\s*[\"']([^\"']*)[\"']", txt)
-    if m is None:
-        bad("catwar-manifest.js: assetRoot не найден")
-    elif m.group(1) != "":
-        bad(
-            f"assetRoot репо-манифеста = {m.group(1)!r}, прод-инвариант '' "
-            f"(canvas пустой при 200-х)"
-        )
-    else:
-        ok("assetRoot репо-манифеста = ''")
-else:
-    print("  — catwar-manifest.js отсутствует")
-
+print("== 5/5 Прод-паттерны ==")
 actbug = 0
 for p in jss:
     if "act{act}" in p.read_text(encoding="utf-8", errors="replace"):

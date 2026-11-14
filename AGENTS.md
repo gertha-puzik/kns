@@ -25,7 +25,7 @@ limits, git protocol). This file is only an entry map; when the two disagree,
 ## Scope
 
 Owner decision 2026-11-14: KNS Paint is the only product here. Everything
-else that used to live in this repo (CatWar code constructor, M2 model and
+else that used to live in this repo (the reference-game coat-code constructor, M2 model and
 masks, tint, mask-annotator, frames studio, fight-demo, weather-demo,
 `skills/kns-imagegen`, specs) is kept in the **private** repo
 `gertha-puzik/kns-archive` (all branches as of 2026-11-14; Actions disabled,
@@ -48,7 +48,7 @@ of the editor in `public/paint-demo/`; syncing it is a separate coop-field PR.
 ## Hard limits (condensed from KNS-CONTEXT §4)
 
 - Do not touch the coop-field repo/runtime (reading it is fine). Never commit
-  Cat War art or `kns_def.json` into this repo or coop-field.
+  reference-game art or its palette dump into this repo or coop-field.
 - No secrets in code/logs/chat; keys live in env variables / GitHub secrets.
 - Never touch the VPS by hand; domain, nginx and certificates are the owner's.
 - Commit identity: `user.name="polexka"`,
