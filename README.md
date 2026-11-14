@@ -18,7 +18,7 @@
 ## Сайт
 
 **https://paint.phainonsmilk.ru** — статика на VPS. Старые адреса
-`kns.phainonsmilk.ru` и `kns.miew.ru` должны вести на него редиректом.
+`kns.phainonsmilk.ru` и `kns.miew.ru` ведут на него редиректом 301.
 
 ## Деплой
 
