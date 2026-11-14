@@ -1,36 +1,38 @@
-# AGENTS.md — KNS (coat editor for coop-field)
+# AGENTS.md — KNS Paint (coat editor for coop-field)
 
-KNS is a prototype coat-color editor for the owner's game coop-field.
-Live: https://kns.miew.ru (pure static, served from `/opt/kns/www` on the VPS).
+KNS Paint is a browser coat-painting editor for the owner's game coop-field:
+the player paints a cat over a sketch and exports a PNG for the game.
+Live: https://paint.phainonsmilk.ru (pure static; the root is the editor).
 This repo stays public; every push to `main` triggers CI (rsync) deploy — see
 `.github/workflows/deploy.yml`.
 
-**Read `KNS-CONTEXT.md` first** — it is the single-file canon (project status,
-hard limits, code grammar, paths, full git protocol). This file is only an entry
-map; when the two disagree, `KNS-CONTEXT.md` wins.
+**Read `KNS-CONTEXT.md` first** — it is the single-file canon (status, hard
+limits, git protocol). This file is only an entry map; when the two disagree,
+`KNS-CONTEXT.md` wins.
 
 ## Entry map
 
 | Path | What |
 |---|---|
-| `KNS-CONTEXT.md` | Canon dossier (§4 hard limits, §5 grammar, §6 paths, §8 conventions). Excluded from deploy — never appears on the site |
-| `docs/kns-tz.md`, `docs/kns-art-list.md` | Product spec and art list |
-| `skills/kns-imagegen/SKILL.md` | Canon sprite-generation pipeline (M2 style) |
-| `tools/pr_qc.py` | Structural merge gate (JSON/JS/CJK/assetRoot checks) — must be green before merge |
+| `index.html` + `paint-data.js` | KNS Paint itself (the site root) |
+| `paint-demo/index.html` | Redirect to `/`, keeps `?query` and `#hash` so old links and deep links work |
+| `KNS-CONTEXT.md` | Canon dossier. Excluded from deploy — never appears on the site |
+| `tools/pr_qc.py` | Structural merge gate (JSON/JS/CJK checks) — must be green before merge |
+| `tools/main_guard.py` | Helper for `main-guard` |
 | `.github/workflows/` | `deploy.yml` (push main → rsync), `kns-qc.yml` (PR gate), `main-guard.yml` (direct pushes to main are auto-reverted) |
 | `README.md` | Human overview (RU) |
 
-## Repo layout
+## Scope
 
-`index.html` — one sentence: the reference pack is no longer shipped
-(same notice on `tint.html`, `mask-annotator.html`, `frames-studio.html`).
-`act0/`, `act1/`, `gray/`, `artpack/`, `model/`, `archive/`, `tint.js` and
-`catwar-manifest.js` are removed from the tree and must not be added back;
-git history is left as-is. `paint-demo/` stays. `weather-demo/` — weather
-demo; `img/` — static extras. If `catwar-manifest.js` is ever restored,
-`assetRoot` must stay `''`.
+Owner decision 2026-11-14: KNS Paint is the only product here. Everything
+else that used to live in this repo (CatWar code constructor, M2 model and
+masks, tint, mask-annotator, frames studio, fight-demo, weather-demo,
+`skills/kns-imagegen`, specs) is kept in the **private** repo
+`gertha-puzik/kns-archive` (all branches as of 2026-11-14; Actions disabled,
+never deploys). Do not add any of it back here. coop-field keeps its own copy
+of the editor in `public/paint-demo/`; syncing it is a separate coop-field PR.
 
-## Workflow (condensed; full protocol = KNS-CONTEXT §8.7)
+## Workflow (condensed; full protocol = KNS-CONTEXT §5.3)
 
 - One task = one branch `<feat|fix|chore|agent>/<slug>` cut from fresh
   `origin/main`, in its own worktree (`git worktree add ../kns-wt/<slug> ...`).
@@ -45,11 +47,10 @@ demo; `img/` — static extras. If `catwar-manifest.js` is ever restored,
 
 ## Hard limits (condensed from KNS-CONTEXT §4)
 
-- Do not touch the coop-field repo/runtime (reading it, e.g. `drawChar`, is
-  fine). Never commit Cat War art or `kns_def.json` into coop-field.
-- CatWar gate slots (whiskers 22, nose 23, ear tufts 10) always 404 on the
-  source server — do not probe repeatedly and do not try to bypass.
-- No secrets in code/logs/chat; keys live in env variables.
+- Do not touch the coop-field repo/runtime (reading it is fine). Never commit
+  Cat War art or `kns_def.json` into this repo or coop-field.
+- No secrets in code/logs/chat; keys live in env variables / GitHub secrets.
+- Never touch the VPS by hand; domain, nginx and certificates are the owner's.
 - Commit identity: `user.name="polexka"`,
   `user.email="polexka@users.noreply.github.com"`.
 
@@ -57,12 +58,7 @@ demo; `img/` — static extras. If `catwar-manifest.js` is ever restored,
 
 - Optional per-clone retrieval helper. Install: `uv tool install graphifyy`
   (double-y; other `graphify*` packages on PyPI are typosquats).
-- Build: `graphify extract . --code-only --out graphify-out` — deterministic
-  tree-sitter AST parse, no LLM, nothing leaves the machine.
-- This repo is small; the entry map above usually beats graph queries. The
-  graph earns its keep for `path` / `affected` across `index.html` inline
-  scripts, `catwar-manifest.js` and `tint.js`.
-- `graphify-out/` is gitignored: a per-clone artifact — never commit it, never
-  build it in CI, never let graph output weaken the QC gate.
-- Graph output is a retrieval HINT: verify the cited `file:line` in the source
-  before editing.
+- Build: `graphify extract . --code-only --out graphify-out` — no LLM, nothing
+  leaves the machine. The repo is tiny; the entry map usually beats the graph.
+- `graphify-out/` is gitignored: never commit it, never build it in CI.
+- Graph output is a hint: verify the cited `file:line` before editing.
